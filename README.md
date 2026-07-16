@@ -1,8 +1,8 @@
-# CNMPlayer (tune)
+# tune
 
 一个基于 Rust 和 Ratatui 构建的现代、高性能网易云音乐终端 (TUI) 播放器。
 
-![CNMPlayer TUI](https://raw.githubusercontent.com/aimy1/tune/main/logo.svg) *(或替换为您自己的运行截图)*
+![tune TUI](https://raw.githubusercontent.com/aimy1/tune/main/logo.svg) *(或替换为您自己的运行截图)*
 
 ---
 
