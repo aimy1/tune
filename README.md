@@ -93,6 +93,12 @@ sudo cp target/release/tune /usr/local/bin/
 
 ---
 
+## 👏 致谢 (Credits)
+
+本项目的灵感与初始版本基于原作者 [@professor-lee](https://github.com/professor-lee) 的优秀开源工作进行开发和二次打磨，在此表示由衷的感谢！
+
+---
+
 ## 📄 开源协议
 
 本项目采用 [MIT License](LICENSE) 开源协议。欢迎提交 PR 和 Issue！
