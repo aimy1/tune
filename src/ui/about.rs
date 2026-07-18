@@ -180,50 +180,74 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let logo = preferred_logo_size();
-    // Give the logo as much room as possible: top-centered full-width panel.
-    let show_art = area.height >= 10 && area.width >= 28;
-    if !show_art {
-        draw_text_column(frame, app, area);
-        return;
-    }
-
-    // Reserve a compact info strip under the logo when height allows.
-    let text_min = 6u16;
-    let art_h = if area.height > text_min + 8 {
-        area.height.saturating_sub(text_min)
-    } else {
-        // Short terminal: almost all body for logo, skip text strip.
-        area.height
-    };
-
-    // Prefer height needed by logo, but never exceed available.
-    let target_art_h = logo
-        .map(|(_, h)| (h as u16).saturating_add(2))
-        .unwrap_or(art_h)
-        .min(art_h)
-        .max(8);
-
-    let use_text_below = area.height.saturating_sub(target_art_h) >= text_min;
-    if use_text_below {
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
+    if area.width >= 64 {
+        // Horizontal side-by-side layout: Left is logo, Right is text info!
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(target_art_h),
-                Constraint::Min(text_min),
+                Constraint::Length(30),
+                Constraint::Length(1),
+                Constraint::Min(10),
             ])
             .split(area);
-        draw_art_panel(frame, app, rows[0]);
-        draw_text_column(
-            frame,
-            app,
-            rows[1].inner(ratatui::layout::Margin {
-                horizontal: 0,
-                vertical: 0,
-            }),
-        );
+        
+        draw_art_panel(frame, app, cols[0]);
+        
+        // Draw vertical separator line
+        let separator = (0..cols[1].height)
+            .map(|_| Line::from(Span::styled("│", Style::default().fg(app.theme.color_buff()))))
+            .collect::<Vec<_>>();
+        frame.render_widget(Paragraph::new(separator), cols[1]);
+        
+        draw_text_column(frame, app, cols[2].inner(ratatui::layout::Margin {
+            horizontal: 1,
+            vertical: 0,
+        }));
     } else {
-        draw_art_panel(frame, app, area);
+        // Vertical layout: Top is logo, Bottom is text info
+        let show_art = area.height >= 10 && area.width >= 28;
+        if !show_art {
+            draw_text_column(frame, app, area);
+            return;
+        }
+
+        let logo = preferred_logo_size();
+        let text_min = 6u16;
+        let art_h = if area.height > text_min + 8 {
+            area.height.saturating_sub(text_min)
+        } else {
+            // Short terminal: almost all body for logo, skip text strip.
+            area.height
+        };
+
+        // Prefer height needed by logo, but never exceed available.
+        let target_art_h = logo
+            .map(|(_, h)| (h as u16).saturating_add(2))
+            .unwrap_or(art_h)
+            .min(art_h)
+            .max(8);
+
+        let use_text_below = area.height.saturating_sub(target_art_h) >= text_min;
+        if use_text_below {
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(target_art_h),
+                    Constraint::Min(text_min),
+                ])
+                .split(area);
+            draw_art_panel(frame, app, rows[0]);
+            draw_text_column(
+                frame,
+                app,
+                rows[1].inner(ratatui::layout::Margin {
+                    horizontal: 0,
+                    vertical: 0,
+                }),
+            );
+        } else {
+            draw_art_panel(frame, app, area);
+        }
     }
 }
 

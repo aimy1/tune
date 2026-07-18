@@ -6,7 +6,34 @@ description = "Tune 是一个基于 Rust 的网易云音乐终端客户端：登
 github_url = "https://github.com/fd/tune"
 
 # --- about braille images: begin ---
-# User-provided logo (music note)
+
+[[braille_images]]
+width = 20
+height = 10
+art = '''
+          ⢀⣴⡆
+      ⢀⣴⣿⠟⠁
+     ⢠⣿⠟⠁
+     ⣿⠏⢀⣀⣀
+     ⢿⡄⠻⠿⠿
+      ⠙⠶⠤⠄
+'''
+
+[[braille_images]]
+width = 30
+height = 12
+art = '''
+                ⢀⣀⡀
+            ⢀⣠⣾⠟⠁
+        ⢀⣠⣴⣿⠟⠁
+      ⢠⣾⠟⠁⣿⠁
+     ⢠⣿⠏    ⣿
+     ⣾⡏     ⣿
+     ⣿      ⣿
+     ⢿⣇    ⣠⣿
+     ⠘⣿⣦⣤⣴⣾⠟⠁
+      ⠈⠙⠛⠛⠁
+'''
 
 [[braille_images]]
 width = 60
@@ -45,5 +72,4 @@ art = '''
                  .^7YPPGPP5YYJJJJJY55PGGP5J!^.
                       ..:~!7??JJJ??7!^:.
 '''
-
 # --- about braille images: end ---
