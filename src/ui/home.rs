@@ -401,8 +401,8 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         }
     } else if app.home_sidebar.status_line.trim().is_empty() {
         match app.config.language {
-            Language::Zh => "󰌌 ⇅切换分区 ↵进入 Esc收起".to_string(),
-            Language::En => "󰌌 ⇅ Switch ↵ Open Esc Close".to_string(),
+            Language::Zh => "󰌌 ⇅/⇄ 切换分区  ↵ 进入  Esc 关闭".to_string(),
+            Language::En => "󰌌 ⇅/⇄ Switch  ↵ Open  Esc Close".to_string(),
         }
     } else {
         app.home_sidebar.status_line.clone()

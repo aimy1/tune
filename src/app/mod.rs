@@ -756,6 +756,18 @@ impl HomeSidebarState {
         if len == 0 {
             return;
         }
+        if self.focused_index + 1 >= len {
+            let other_section = match self.focused_section {
+                HomeSidebarSection::Created => HomeSidebarSection::Collected,
+                HomeSidebarSection::Collected => HomeSidebarSection::Created,
+            };
+            if self.section_len(other_section) > 0 {
+                self.focused_section = other_section;
+                self.focused_index = 0;
+                self.sync_memory_from_current();
+                return;
+            }
+        }
         self.focused_index = (self.focused_index + 1) % len;
         self.sync_memory_from_current();
     }
@@ -764,6 +776,19 @@ impl HomeSidebarState {
         let len = self.section_len(self.focused_section);
         if len == 0 {
             return;
+        }
+        if self.focused_index == 0 {
+            let other_section = match self.focused_section {
+                HomeSidebarSection::Created => HomeSidebarSection::Collected,
+                HomeSidebarSection::Collected => HomeSidebarSection::Created,
+            };
+            let other_len = self.section_len(other_section);
+            if other_len > 0 {
+                self.focused_section = other_section;
+                self.focused_index = other_len.saturating_sub(1);
+                self.sync_memory_from_current();
+                return;
+            }
         }
         self.focused_index = if self.focused_index == 0 {
             len - 1
@@ -4272,6 +4297,7 @@ impl App {
                 }
                 KeyCode::Up | KeyCode::BackTab => self.home_sidebar.focus_prev(),
                 KeyCode::Down | KeyCode::Tab => self.home_sidebar.focus_next(),
+                KeyCode::Left | KeyCode::Right => self.home_sidebar.switch_section_next(),
                 KeyCode::Enter => self.open_focused_home_sidebar_playlist().await,
                 _ => {}
             }
