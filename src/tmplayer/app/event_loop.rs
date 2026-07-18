@@ -160,6 +160,7 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
         },
         eq_bands_db: app.config.eq_bands_db,
         playback_memory: app.config.playback_memory,
+        transparent_sidebar: app.config.transparent_sidebar,
         vip_audio_unlocked: app.vip_audio_unlocked,
         show_hints: app.config.show_hints,
         home_more_recommend: app.config.home_more_recommend,
@@ -215,6 +216,7 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
     app.config.eq_bands_db = config.eq_bands_db;
     app.eq.bands_db = config.eq_bands_db;
     app.config.playback_memory = config.playback_memory;
+    app.config.transparent_sidebar = config.transparent_sidebar;
     app.config.show_hints = config.show_hints;
     app.config.home_more_recommend = config.home_more_recommend;
     app.config.visualize = match config.visualize {

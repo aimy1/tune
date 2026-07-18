@@ -55,7 +55,7 @@ const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 10;
-const SETTINGS_PLAYBACK_ITEMS: usize = 9;
+const SETTINGS_PLAYBACK_ITEMS: usize = 10;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 17;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
@@ -4200,6 +4200,10 @@ impl App {
                     self.clear_playback_memory();
                 }
             }
+            9 => {
+                self.config.transparent_sidebar = !self.config.transparent_sidebar;
+                let _ = self.config.save();
+            }
             _ => {}
         }
     }
@@ -4597,6 +4601,7 @@ impl App {
             audio_quality: self.config.audio_quality,
             eq_bands_db: self.config.eq_bands_db,
             playback_memory: self.config.playback_memory,
+            transparent_sidebar: self.config.transparent_sidebar,
             vip_audio_unlocked: self.vip_audio_unlocked,
             show_hints: self.config.show_hints,
             home_more_recommend: self.config.home_more_recommend,
@@ -4675,6 +4680,11 @@ impl App {
             } else {
                 self.clear_playback_memory();
             }
+        }
+
+        if self.config.transparent_sidebar != sync.transparent_sidebar {
+            self.config.transparent_sidebar = sync.transparent_sidebar;
+            changed = true;
         }
 
         if self.config.show_hints != sync.show_hints {

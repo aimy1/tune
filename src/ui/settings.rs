@@ -205,6 +205,11 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             l(app, "播放记忆", "Playback Memory"),
             on_off(app, app.config.playback_memory)
         ),
+        format!(
+            "{}: {}",
+            l(app, "侧边栏透明", "Sidebar Transparent"),
+            on_off(app, app.config.transparent_sidebar)
+        ),
     ];
 
     let lines: Vec<Line> = items

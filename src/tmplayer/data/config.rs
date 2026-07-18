@@ -50,6 +50,9 @@ pub struct Config {
     #[serde(default)]
     pub playback_memory: bool,
 
+    #[serde(default)]
+    pub transparent_sidebar: bool,
+
     #[serde(default = "default_show_hints")]
     pub show_hints: bool,
 
@@ -364,6 +367,7 @@ impl Default for Config {
             bars_gap: false,
             audio_quality: default_audio_quality(),
             playback_memory: false,
+            transparent_sidebar: false,
             show_hints: default_show_hints(),
             home_more_recommend: false,
             bar_number: default_bar_number(),
@@ -434,6 +438,7 @@ impl Config {
             || !raw.contains("bar_channel_reverse")
             || !raw.contains("audio_quality")
             || !raw.contains("playback_memory")
+            || !raw.contains("transparent_sidebar")
             || !raw.contains("page_lyrics")
             || !raw.contains("show_hints")
             || !raw.contains("home_more_recommend")

@@ -102,6 +102,7 @@ pub struct HostConfigSync {
     pub audio_quality: HostAudioQuality,
     pub eq_bands_db: [f32; crate::tmplayer::app::state::EQ_BANDS],
     pub playback_memory: bool,
+    pub transparent_sidebar: bool,
     pub vip_audio_unlocked: bool,
     pub show_hints: bool,
     pub home_more_recommend: bool,
@@ -187,6 +188,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
             HostAudioQuality::Jymaster => data::config::AudioQuality::Jymaster,
         },
         playback_memory: host.playback_memory,
+        transparent_sidebar: host.transparent_sidebar,
         show_hints: host.show_hints,
         home_more_recommend: host.home_more_recommend,
         bar_number: match host.bar_number {

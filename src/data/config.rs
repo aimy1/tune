@@ -122,6 +122,9 @@ pub struct Config {
     #[serde(default)]
     pub playback_memory: bool,
 
+    #[serde(default)]
+    pub transparent_sidebar: bool,
+
     #[serde(default = "default_show_hints")]
     pub show_hints: bool,
 
@@ -512,6 +515,7 @@ impl Default for Config {
             page_lyrics: default_page_lyrics(),
             audio_quality: default_audio_quality(),
             playback_memory: false,
+            transparent_sidebar: false,
             show_hints: default_show_hints(),
             home_more_recommend: false,
             cache: CacheConfig::default(),
@@ -577,6 +581,7 @@ impl Config {
             || !raw.contains("eq_bands_db")
             || !raw.contains("audio_quality")
             || !raw.contains("playback_memory")
+            || !raw.contains("transparent_sidebar")
             || !raw.contains("show_hints")
             || !raw.contains("home_more_recommend")
             || !raw.contains("[cache]")

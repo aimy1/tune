@@ -295,7 +295,7 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let max_width = (area.width / 3).max(24).min(area.width);
+    let max_width = (area.width / 3).max(24).min(area.width).min(42);
     app.set_home_sidebar_anim_span_cells(max_width);
     let progress = app.home_sidebar.anim_progress.clamp(0.0, 1.0);
     // EaseOutQuad: f(t) = 1 - (1 - t)^2
@@ -305,11 +305,15 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    let x = area.x + (area.width.saturating_sub(width)) / 2;
+    let height = ((area.height * 85) / 100).max(12).min(area.height);
+    let y = area.y + (area.height.saturating_sub(height)) / 2;
+
     let sidebar = Rect {
-        x: area.x,
-        y: area.y,
+        x,
+        y,
         width,
-        height: area.height,
+        height,
     };
 
     frame.render_widget(Clear, sidebar);
@@ -326,9 +330,13 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         Language::En => " 󰎄 My Playlists ",
     };
 
-    let panel_style = Style::default()
-        .fg(app.theme.color_subtext())
-        .bg(app.theme.color_surface());
+    let panel_style = if app.config.transparent_sidebar {
+        Style::default().fg(app.theme.color_subtext())
+    } else {
+        Style::default()
+            .fg(app.theme.color_subtext())
+            .bg(app.theme.color_surface())
+    };
 
     let border_style = if app.home_sidebar.expanded {
         Style::default()
@@ -473,8 +481,14 @@ fn draw_home_sidebar_section(
         Style::default().fg(app.theme.color_subtext())
     };
 
+    let bg_style = if app.config.transparent_sidebar {
+        Style::default()
+    } else {
+        Style::default().bg(app.theme.color_surface())
+    };
+
     frame.render_widget(
-        Block::default().style(Style::default().bg(app.theme.color_surface())),
+        Block::default().style(bg_style),
         area,
     );
 
@@ -498,7 +512,7 @@ fn draw_home_sidebar_section(
                 Span::styled(title_icon, section_title_style),
                 Span::styled(clipped_title, section_title_style),
             ]))
-            .style(Style::default().bg(app.theme.color_surface())),
+            .style(bg_style),
             title_line_area,
         );
     }
@@ -602,26 +616,38 @@ fn draw_home_sidebar_section(
             );
 
             let row_bg = if is_focused {
-                app.theme.color_buff()
+                Some(app.theme.color_buff())
+            } else if app.config.transparent_sidebar {
+                None
             } else {
-                app.theme.color_surface()
+                Some(app.theme.color_surface())
             };
 
-            let text_style = if is_focused {
-                Style::default()
-                    .fg(app.theme.color_accent())
-                    .bg(row_bg)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(app.theme.color_text()).bg(row_bg)
+            let text_style = {
+                let mut s = if is_focused {
+                    Style::default()
+                        .fg(app.theme.color_accent())
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(app.theme.color_text())
+                };
+                if let Some(bg) = row_bg {
+                    s = s.bg(bg);
+                }
+                s
             };
-            let right_style = if is_focused {
-                Style::default()
-                    .fg(app.theme.color_accent())
-                    .bg(row_bg)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(app.theme.color_subtext()).bg(row_bg)
+            let right_style = {
+                let mut s = if is_focused {
+                    Style::default()
+                        .fg(app.theme.color_accent())
+                        .add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(app.theme.color_subtext())
+                };
+                if let Some(bg) = row_bg {
+                    s = s.bg(bg);
+                }
+                s
             };
 
             lines.push(Line::from(vec![
@@ -633,7 +659,7 @@ fn draw_home_sidebar_section(
     }
 
     frame.render_widget(
-        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(lines).style(bg_style),
         inner,
     );
 }
