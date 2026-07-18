@@ -412,19 +412,19 @@ fn default_cache_clean_on_startup() -> bool {
 }
 
 fn default_keybind_search_box() -> String {
-    "Ctrl+S".to_string()
+    "S".to_string()
 }
 
 fn default_keybind_fullscreen() -> String {
-    "Ctrl+F".to_string()
+    "F".to_string()
 }
 
 fn default_keybind_settings() -> String {
-    "T".to_string()
+    ",".to_string()
 }
 
 fn default_keybind_sidebar() -> String {
-    "P".to_string()
+    "B".to_string()
 }
 
 fn is_legacy_sidebar_default(value: &str) -> bool {
@@ -437,19 +437,19 @@ fn default_keybind_quit() -> String {
 }
 
 fn default_keybind_prev() -> String {
-    "Alt+Left".to_string()
+    "[".to_string()
 }
 
 fn default_keybind_next() -> String {
-    "Alt+Right".to_string()
+    "]".to_string()
 }
 
 fn default_keybind_toggle_play_pause() -> String {
-    "Alt+Space".to_string()
+    "Space".to_string()
 }
 
 fn default_keybind_toggle_mode() -> String {
-    "Alt+M".to_string()
+    "M".to_string()
 }
 
 fn default_keybind_fullscreen_prev() -> String {
@@ -481,7 +481,7 @@ fn default_keybind_toggle_like_fullscreen() -> String {
 }
 
 fn default_keybind_toggle_like_collapsed() -> String {
-    "Alt+L".to_string()
+    "L".to_string()
 }
 
 impl Default for Config {

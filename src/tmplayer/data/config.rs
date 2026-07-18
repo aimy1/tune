@@ -277,19 +277,19 @@ fn default_show_hints() -> bool {
 }
 
 fn default_keybind_search_box() -> String {
-    "Ctrl+S".to_string()
+    "S".to_string()
 }
 
 fn default_keybind_fullscreen() -> String {
-    "Ctrl+F".to_string()
+    "F".to_string()
 }
 
 fn default_keybind_settings() -> String {
-    "T".to_string()
+    ",".to_string()
 }
 
 fn default_keybind_sidebar() -> String {
-    "P".to_string()
+    "B".to_string()
 }
 
 #[allow(dead_code)]
@@ -303,19 +303,19 @@ fn default_keybind_quit() -> String {
 }
 
 fn default_keybind_prev() -> String {
-    "Alt+Left".to_string()
+    "[".to_string()
 }
 
 fn default_keybind_next() -> String {
-    "Alt+Right".to_string()
+    "]".to_string()
 }
 
 fn default_keybind_toggle_play_pause() -> String {
-    "Alt+Space".to_string()
+    "Space".to_string()
 }
 
 fn default_keybind_toggle_mode() -> String {
-    "Alt+M".to_string()
+    "M".to_string()
 }
 
 fn default_keybind_fullscreen_prev() -> String {
