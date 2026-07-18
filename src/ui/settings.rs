@@ -6,6 +6,7 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use unicode_width::UnicodeWidthStr;
 
 pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
     let size = frame.area();
@@ -67,48 +68,55 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
         rows[0],
     );
 
-    let items = vec![
-        format!("{}: {}", l(app, "主题", "Theme"), app.config.theme),
-        format!(
-            "{}: {}",
+    let raw_items = vec![
+        (l(app, "主题", "Theme"), app.config.theme.clone()),
+        (
             l(app, "背景透明", "Transparent Background"),
-            on_off(app, app.config.transparent_background)
+            on_off(app, app.config.transparent_background).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "语言", "Language"),
             match app.config.language {
-                Language::Zh => l(app, "中文", "Chinese"),
-                Language::En => "English",
-            }
+                Language::Zh => l(app, "中文", "Chinese").to_string(),
+                Language::En => "English".to_string(),
+            },
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "图像协议", "Image Protocol"),
-            app.config.graphics_protocol.display_name()
+            app.config.graphics_protocol.display_name().to_string(),
         ),
-        format!("{}...", l(app, "播放设置", "Playback Settings")),
-        format!("{}...", l(app, "按键绑定", "Keybinds")),
-        format!(
-            "{}: {}",
+        (
+            l(app, "播放设置", "Playback Settings"),
+            "...".to_string(),
+        ),
+        (
+            l(app, "按键绑定", "Keybinds"),
+            "...".to_string(),
+        ),
+        (
             l(app, "显示提示", "Show Hints"),
-            on_off(app, app.config.show_hints)
+            on_off(app, app.config.show_hints).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "主页更多推荐", "More Home Recommendations"),
-            on_off(app, app.config.home_more_recommend)
+            on_off(app, app.config.home_more_recommend).to_string(),
         ),
-        l(app, "退出登录", "Logout").to_string(),
-        l(app, "关于", "About").to_string(),
+        (
+            l(app, "退出登录", "Logout"),
+            "".to_string(),
+        ),
+        (
+            l(app, "关于", "About"),
+            "".to_string(),
+        ),
     ];
 
-    let lines: Vec<Line> = items
+    let lines: Vec<Line> = raw_items
         .iter()
         .enumerate()
-        .map(|(idx, text)| {
+        .map(|(idx, (key, val))| {
             let selected = idx == app.settings_selected;
-            let prefix = if selected { " › " } else { "   " };
+            let prefix = if selected { "› " } else { "  " };
             let style = if selected {
                 Style::default()
                     .fg(app.theme.color_base())
@@ -119,7 +127,8 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
                     .fg(app.theme.color_text())
                     .bg(app.theme.color_surface())
             };
-            Line::from(Span::styled(format!("{prefix}{text}"), style))
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
         })
         .collect();
 
@@ -163,62 +172,54 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
         BarChannels::Stereo => "Stereo",
     };
 
-    let items = vec![
-        format!(
-            "{}: {}",
+    let raw_items = vec![
+        (
             l(app, "可视化", "Visualization"),
             match app.config.visualize {
-                VisualizeMode::Off => l(app, "关闭", "Off"),
-                VisualizeMode::Bars => l(app, "频谱", "Bars"),
-                VisualizeMode::Oscilloscope => l(app, "示波器", "Oscilloscope"),
+                VisualizeMode::Off => l(app, "关闭", "Off").to_string(),
+                VisualizeMode::Bars => l(app, "频谱", "Bars").to_string(),
+                VisualizeMode::Oscilloscope => l(app, "示波器", "Oscilloscope").to_string(),
             }
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "超级流畅", "Super Smooth"),
-            on_off(app, app.config.super_smooth_bar)
+            on_off(app, app.config.super_smooth_bar).to_string()
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "频谱间隔", "Bars Gap"),
-            on_off(app, app.config.bars_gap)
+            on_off(app, app.config.bars_gap).to_string()
         ),
-        format!("{}: {}", l(app, "频谱数", "Bars Count"), bar_number),
-        format!("{}: {}", l(app, "声道", "Channels"), channels),
-        format!(
-            "{}: {}",
+        (l(app, "频谱数", "Bars Count"), bar_number.to_string()),
+        (l(app, "声道", "Channels"), channels.to_string()),
+        (
             l(app, "封面边框", "Cover Border"),
-            on_off(app, app.config.album_border)
+            on_off(app, app.config.album_border).to_string()
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "页面歌词", "Page Lyrics"),
-            on_off(app, app.config.page_lyrics)
+            on_off(app, app.config.page_lyrics).to_string()
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "音质", "Audio Quality"),
-            audio_quality_label(app, app.config.audio_quality)
+            audio_quality_label(app, app.config.audio_quality).to_string()
         ),
-        format!(
-            "{}: {}",
+        (
             l(app, "播放记忆", "Playback Memory"),
-            on_off(app, app.config.playback_memory)
+            on_off(app, app.config.playback_memory).to_string()
         ),
-        format!(
-            "{}: {}",
-            l(app, "侧边栏透明", "Sidebar Transparent"),
-            on_off(app, app.config.transparent_sidebar)
+        (
+            l(app, "个人中心透明", "Personal Center Transparent"),
+            on_off(app, app.config.transparent_sidebar).to_string()
         ),
     ];
 
-    let lines: Vec<Line> = items
+    let lines: Vec<Line> = raw_items
         .iter()
         .enumerate()
-        .map(|(idx, text)| {
+        .map(|(idx, (key, val))| {
             let selected = idx == app.settings_playback_selected;
             let disabled = idx == 0 && !crate::tmplayer::audio::cava::is_available();
-            let prefix = if selected { " › " } else { "   " };
+            let prefix = if selected { "› " } else { "  " };
             let style = if disabled {
                 Style::default()
                     .fg(app.theme.color_subtext())
@@ -233,7 +234,8 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
                     .fg(app.theme.color_text())
                     .bg(app.theme.color_surface())
             };
-            Line::from(Span::styled(format!("{prefix}{text}"), style))
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
         })
         .collect();
     frame.render_widget(
@@ -266,9 +268,9 @@ fn draw_keybind_settings(frame: &mut Frame, app: &App, inner: Rect) {
             let is_rebinding = app.settings_keybind_rebinding == Some(idx);
             let selected = idx == app.settings_keybind_selected;
             let prefix = if is_rebinding || selected {
-                " › "
+                "› "
             } else {
-                "   "
+                "  "
             };
             let style = if is_rebinding {
                 Style::default()
@@ -286,12 +288,20 @@ fn draw_keybind_settings(frame: &mut Frame, app: &App, inner: Rect) {
                     .bg(app.theme.color_surface())
             };
 
-            let mut label = app.keybind_label_for_index(idx);
+            let full_label = app.keybind_label_for_index(idx);
+            let (key, val) = if let Some(pos) = full_label.find(": ") {
+                (full_label[..pos].to_string(), full_label[pos + 2..].to_string())
+            } else {
+                (full_label, "".to_string())
+            };
+
+            let mut val_str = val;
             if is_rebinding {
-                label.push_str(l(app, "  [等待输入]", "  [Waiting Input]"));
+                val_str.push_str(l(app, "  [等待输入]", "  [Waiting Input]"));
             }
 
-            Line::from(Span::styled(format!("{prefix}{label}"), style))
+            let line_str = format_setting_line(prefix, &key, &val_str, inner.width);
+            Line::from(Span::styled(line_str, style))
         })
         .collect();
 
@@ -300,8 +310,8 @@ fn draw_keybind_settings(frame: &mut Frame, app: &App, inner: Rect) {
             "  {}",
             l(
                 app,
-                "侧边栏歌单区切换（Ctrl+up/down）",
-                "Sidebar Playlist Section Switch (Ctrl+Up/Down)",
+                "个人中心分区切换（Left/Right 或 滚动到边界）",
+                "Personal Center Section Switch (Left/Right or Scroll Boundary)",
             )
         ),
         Style::default().fg(app.theme.color_subtext()),
@@ -444,4 +454,14 @@ fn on_off(app: &App, enabled: bool) -> &'static str {
             }
         }
     }
+}
+
+fn format_setting_line(prefix: &str, key: &str, val: &str, width: u16) -> String {
+    let prefix_w = UnicodeWidthStr::width(prefix);
+    let key_w = UnicodeWidthStr::width(key);
+    let val_w = UnicodeWidthStr::width(val);
+    
+    let padding_budget = (width as usize).saturating_sub(prefix_w + key_w + val_w + 2);
+    let pad = " ".repeat(padding_budget);
+    format!(" {prefix}{key}{pad}{val} ")
 }
