@@ -222,6 +222,14 @@ fn draw_playlist_tracks(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
+    let border_style = if !app.home_sidebar.expanded {
+        Style::default()
+            .fg(app.theme.color_accent())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(app.theme.color_buff())
+    };
+
     frame.render_widget(
         Block::default()
             .borders(Borders::TOP)
@@ -229,7 +237,7 @@ fn draw_playlist_tracks(frame: &mut Frame, app: &mut App, area: Rect) {
                 Language::Zh => " 曲目 ",
                 Language::En => " Tracks ",
             })
-            .border_style(Style::default().fg(app.theme.color_buff())),
+            .border_style(border_style),
         area,
     );
 
@@ -301,28 +309,51 @@ fn draw_playlist_tracks(frame: &mut Frame, app: &mut App, area: Rect) {
         };
 
         let index_label = if is_now_playing {
-            " ▶".to_string()
+            " 󰎆".to_string()
         } else {
-            format!("{:>2}", track_idx + 1)
+            format!(" {:>2}", track_idx + 1)
         };
 
         let duration = track.duration.clone();
         let duration_style = if focused {
             Style::default().fg(app.theme.color_accent())
         } else if is_now_playing {
-            Style::default().fg(app.theme.color_accent3())
+            Style::default().fg(app.theme.color_accent3()).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(app.theme.color_subtext())
         };
 
-        let reserved = 6 + display_width(&duration);
-        let max_left = usize::from(row.width).saturating_sub(reserved);
+        let prefix_width = 1;
+        let index_width = 5;
+        let duration_w = display_width(&duration);
+        let duration_col_width = duration_w + 2;
 
-        let title_max = (max_left * 65) / 100;
-        let artist_max = max_left.saturating_sub(title_max);
+        let rem_w = usize::from(row.width)
+            .saturating_sub(prefix_width + index_width + duration_col_width);
 
+        let title_max = (rem_w * 60) / 100;
+        let artist_max = rem_w.saturating_sub(title_max);
+
+        // Pad index column
+        let idx_w = display_width(&index_label);
+        let idx_pad = index_width.saturating_sub(idx_w);
+        let padded_idx = format!("{}{}", index_label, " ".repeat(idx_pad));
+
+        // Title Column
         let clipped_title = clip_to_display_width(&track.title, title_max);
+        let title_len = display_width(&clipped_title);
+        let title_pad = title_max.saturating_sub(title_len);
+        let title_col = format!("{}{}", clipped_title, " ".repeat(title_pad));
+
+        // Artist Column
         let clipped_artist = clip_to_display_width(&track.artist, artist_max);
+        let artist_len = display_width(&clipped_artist);
+        let artist_pad = artist_max.saturating_sub(artist_len);
+        let artist_col = format!("{}{}", clipped_artist, " ".repeat(artist_pad));
+
+        // Duration Column
+        let dur_pad = duration_col_width.saturating_sub(duration_w);
+        let dur_col = format!("{}{}", " ".repeat(dur_pad), duration);
 
         let title_style = if focused {
             Style::default().fg(app.theme.color_accent()).add_modifier(Modifier::BOLD)
@@ -340,23 +371,10 @@ fn draw_playlist_tracks(frame: &mut Frame, app: &mut App, area: Rect) {
 
         let mut spans = Vec::new();
         spans.push(Span::styled(if focused { "▌" } else { " " }, bg_style(prefix_style)));
-        spans.push(Span::styled(index_label, bg_style(index_style)));
-        spans.push(Span::styled(" ", bg_style(Style::default())));
-        spans.push(Span::styled(clipped_title, bg_style(title_style)));
-
-        if !clipped_artist.is_empty() {
-            spans.push(Span::styled(" - ", bg_style(Style::default().fg(app.theme.color_subtext()))));
-            spans.push(Span::styled(clipped_artist, bg_style(artist_style)));
-        }
-
-        let used = 1 + 2 + 1 
-            + display_width(&track.title).min(title_max) 
-            + (if track.artist.is_empty() { 0 } else { 3 + display_width(&track.artist).min(artist_max) }) 
-            + display_width(&duration);
-        let space = usize::from(row.width).saturating_sub(used).max(1);
-
-        spans.push(Span::styled(" ".repeat(space), bg_style(Style::default())));
-        spans.push(Span::styled(duration, bg_style(duration_style)));
+        spans.push(Span::styled(padded_idx, bg_style(index_style)));
+        spans.push(Span::styled(title_col, bg_style(title_style)));
+        spans.push(Span::styled(artist_col, bg_style(artist_style)));
+        spans.push(Span::styled(dur_col, bg_style(duration_style)));
 
         frame.render_widget(
             Paragraph::new(Line::from(spans)),

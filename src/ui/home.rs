@@ -136,6 +136,7 @@ fn draw_tiles(frame: &mut Frame, app: &mut App, area: Rect) {
         } else {
             Style::default().bg(tile_bg)
         };
+
         let border_style = if focused {
             Style::default()
                 .fg(app.theme.color_accent())
@@ -144,10 +145,15 @@ fn draw_tiles(frame: &mut Frame, app: &mut App, area: Rect) {
             Style::default().fg(app.theme.color_buff())
         };
 
-        // Soft rounded cards; focus uses accent border + surface fill (no heavy double border).
+        let border_type = if focused {
+            ratatui::widgets::BorderType::Double
+        } else {
+            ratatui::widgets::BorderType::Rounded
+        };
+
         let mut block = Block::default()
             .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_type(border_type)
             .border_style(border_style)
             .style(tile_style);
 
@@ -332,10 +338,16 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         Style::default().fg(app.theme.color_buff())
     };
 
+    let border_type = if app.home_sidebar.expanded {
+        ratatui::widgets::BorderType::Double
+    } else {
+        ratatui::widgets::BorderType::Rounded
+    };
+
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_type(border_type)
             .title(Line::from(Span::styled(
                 title,
                 Style::default()

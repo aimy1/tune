@@ -6,7 +6,7 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::widgets::{Block, Borders, Paragraph};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub fn draw_search(frame: &mut Frame, app: &mut App) {
@@ -55,10 +55,32 @@ pub fn draw_search(frame: &mut Frame, app: &mut App) {
 }
 
 fn draw_result_panel(frame: &mut Frame, app: &mut App, area: Rect) {
-    let inner = area.inner(ratatui::layout::Margin {
-        horizontal: 1,
-        vertical: 1,
-    });
+    let border_style = if !app.home_sidebar.expanded {
+        Style::default()
+            .fg(app.theme.color_accent())
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(app.theme.color_buff())
+    };
+
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::TOP)
+            .title(match app.config.language {
+                Language::Zh => " 搜索结果 ",
+                Language::En => " Search Results ",
+            })
+            .border_style(border_style),
+        area,
+    );
+
+    let inner = Rect {
+        x: area.x.saturating_add(1),
+        y: area.y.saturating_add(1),
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(1),
+    };
+
     if inner.width < 10 || inner.height < 2 {
         return;
     }
@@ -140,7 +162,7 @@ fn render_search_row(
     let is_now_playing = app.is_now_playing_song(item.song_id.as_deref());
     let zebra_bg = if app.config.transparent_background {
         None
-    } else if item_idx.is_multiple_of(2) {
+    } else if item_idx % 2 == 0 {
         Some(app.theme.color_base())
     } else {
         Some(app.theme.color_surface())
@@ -177,9 +199,9 @@ fn render_search_row(
     };
 
     let index_label = if is_now_playing {
-        " ▶".to_string()
+        " 󰎆".to_string()
     } else {
-        format!("{:>2}", item_idx + 1)
+        format!(" {:>2}", item_idx + 1)
     };
 
     let right = item
@@ -204,20 +226,55 @@ fn render_search_row(
         Style::default().fg(app.theme.color_text())
     };
 
-    let reserved = 6 + display_width(&right);
-    let left_max = usize::from(row.width).saturating_sub(reserved);
-    let clipped_left = clip_to_display_width(&item.left_label, left_max);
+    let prefix_width = 1;
+    let index_width = 5;
+    let right_w = display_width(&right);
+    let right_col_width = right_w + 2;
 
-    let used = 1 + 2 + 1 + display_width(&clipped_left) + display_width(&right);
-    let space = usize::from(row.width).saturating_sub(used).max(1);
+    let rem_w = usize::from(row.width)
+        .saturating_sub(prefix_width + index_width + right_col_width);
+
+    // Pad index column
+    let idx_w = display_width(&index_label);
+    let idx_pad = index_width.saturating_sub(idx_w);
+    let padded_idx = format!("{}{}", index_label, " ".repeat(idx_pad));
 
     let mut spans = Vec::new();
     spans.push(Span::styled(if focused { "▌" } else { " " }, bg_style(prefix_style)));
-    spans.push(Span::styled(index_label, bg_style(index_style)));
-    spans.push(Span::styled(" ", bg_style(Style::default())));
-    spans.push(Span::styled(clipped_left, bg_style(left_style)));
-    spans.push(Span::styled(" ".repeat(space), bg_style(Style::default())));
-    spans.push(Span::styled(right, bg_style(right_style)));
+    spans.push(Span::styled(padded_idx, bg_style(index_style)));
+
+    if let (Some(title), Some(artist)) = (&item.title, &item.artist) {
+        let title_max = (rem_w * 60) / 100;
+        let artist_max = rem_w.saturating_sub(title_max);
+
+        // Title Column
+        let clipped_title = clip_to_display_width(title, title_max);
+        let title_len = display_width(&clipped_title);
+        let title_pad = title_max.saturating_sub(title_len);
+        let title_col = format!("{}{}", clipped_title, " ".repeat(title_pad));
+
+        // Artist Column
+        let clipped_artist = clip_to_display_width(artist, artist_max);
+        let artist_len = display_width(&clipped_artist);
+        let artist_pad = artist_max.saturating_sub(artist_len);
+        let artist_col = format!("{}{}", clipped_artist, " ".repeat(artist_pad));
+
+        spans.push(Span::styled(title_col, bg_style(left_style)));
+        spans.push(Span::styled(artist_col, bg_style(right_style)));
+    } else {
+        let left_max = rem_w;
+        let clipped_left = clip_to_display_width(&item.left_label, left_max);
+        let left_len = display_width(&clipped_left);
+        let left_pad = left_max.saturating_sub(left_len);
+        let left_col = format!("{}{}", clipped_left, " ".repeat(left_pad));
+
+        spans.push(Span::styled(left_col, bg_style(left_style)));
+    }
+
+    // Right Column
+    let right_pad = right_col_width.saturating_sub(right_w);
+    let right_col = format!("{}{}", " ".repeat(right_pad), right);
+    spans.push(Span::styled(right_col, bg_style(right_style)));
 
     frame.render_widget(
         Paragraph::new(Line::from(spans)),

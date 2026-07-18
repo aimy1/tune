@@ -1,6 +1,6 @@
 use crate::app::{App, Overlay, Page};
 use ratatui::Frame;
-use ratatui::layout::{Rect, Alignment};
+use ratatui::layout::{Rect, Alignment, Layout, Direction, Constraint};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -66,13 +66,21 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         crate::data::config::Language::En => "Convey the power of music",
     };
 
-    let left_spans = vec![
-        Span::styled(logo_text, logo_style),
-        Span::styled("  ", with_bar_bg(Style::default())),
-        Span::styled("│", separator_style),
-        Span::styled("  ", with_bar_bg(Style::default())),
-        Span::styled(tagline_text, tagline_style),
-    ];
+    let show_full_header = inner.width >= 80;
+
+    let left_spans = if show_full_header {
+        vec![
+            Span::styled(logo_text, logo_style),
+            Span::styled("  ", with_bar_bg(Style::default())),
+            Span::styled("│", separator_style),
+            Span::styled("  ", with_bar_bg(Style::default())),
+            Span::styled(tagline_text, tagline_style),
+        ]
+    } else {
+        vec![
+            Span::styled(logo_text, logo_style),
+        ]
+    };
 
     let user_name = if app.home_sidebar.user_name.trim().is_empty() {
         match app.config.language {
@@ -96,14 +104,90 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled(" ", with_bar_bg(Style::default())),
     ];
 
+    let header_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(if show_full_header {
+            [
+                Constraint::Length(35),
+                Constraint::Min(10),
+                Constraint::Length(25),
+            ]
+        } else {
+            [
+                Constraint::Min(10),
+                Constraint::Length(0),
+                Constraint::Length(25),
+            ]
+        })
+        .split(inner);
+
     frame.render_widget(
         Paragraph::new(Line::from(left_spans)).alignment(Alignment::Left),
-        inner,
+        header_cols[0],
     );
+
+    if show_full_header {
+        let active_idx = match app.page {
+            Page::Home => 0,
+            Page::Playlist => 1,
+            Page::Author => 2,
+            Page::Search => 3,
+            _ => 99,
+        };
+
+        let tabs = match app.config.language {
+            crate::data::config::Language::Zh => vec![
+                (0, " 󰎆 发现 "),
+                (1, " 󰓇 歌单 "),
+                (2, " 󰀄 歌手 "),
+                (3, " 🔍 搜索 "),
+            ],
+            crate::data::config::Language::En => vec![
+                (0, " 󰎆 Discover "),
+                (1, " 󰓇 Playlist "),
+                (2, " 󰀄 Artist "),
+                (3, " 🔍 Search "),
+            ],
+        };
+
+        let mut tab_spans = Vec::new();
+        for (idx, label) in tabs {
+            if idx > 0 {
+                tab_spans.push(Span::styled("   ", with_bar_bg(Style::default())));
+            }
+            if idx == active_idx {
+                tab_spans.push(Span::styled(
+                    "[",
+                    with_bar_bg(Style::default().fg(app.theme.color_accent())),
+                ));
+                tab_spans.push(Span::styled(
+                    label,
+                    Style::default()
+                        .fg(app.theme.color_base())
+                        .bg(app.theme.color_accent())
+                        .add_modifier(Modifier::BOLD),
+                ));
+                tab_spans.push(Span::styled(
+                    "]",
+                    with_bar_bg(Style::default().fg(app.theme.color_accent())),
+                ));
+            } else {
+                tab_spans.push(Span::styled(
+                    label,
+                    with_bar_bg(Style::default().fg(app.theme.color_subtext())),
+                ));
+            }
+        }
+
+        frame.render_widget(
+            Paragraph::new(Line::from(tab_spans)).alignment(Alignment::Center),
+            header_cols[1],
+        );
+    }
 
     frame.render_widget(
         Paragraph::new(Line::from(right_spans)).alignment(Alignment::Right),
-        inner,
+        header_cols[2],
     );
 }
 
