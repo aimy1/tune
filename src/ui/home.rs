@@ -295,7 +295,7 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         return;
     }
 
-    let max_width = (area.width / 3).max(24).min(area.width).min(42);
+    let max_width = (area.width * 45 / 100).max(36).min(area.width).min(56);
     app.set_home_sidebar_anim_span_cells(max_width);
     let progress = app.home_sidebar.anim_progress.clamp(0.0, 1.0);
     // EaseOutQuad: f(t) = 1 - (1 - t)^2
@@ -326,8 +326,8 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
     }));
 
     let title = match app.config.language {
-        Language::Zh => " 󰎄 我的歌单 ",
-        Language::En => " 󰎄 My Playlists ",
+        Language::Zh => " 󰀄 个人中心 ",
+        Language::En => " 󰀄 Personal Center ",
     };
 
     let panel_style = if app.config.transparent_sidebar {
@@ -368,23 +368,27 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
     );
 
     let inner = sidebar.inner(ratatui::layout::Margin {
-        horizontal: 1,
+        horizontal: 2,
         vertical: 1,
     });
-    if inner.width < 8 || inner.height < 4 {
+    if inner.width < 8 || inner.height < 5 {
         return;
     }
 
-    let header_height = if inner.height >= 5 { 2 } else { 1 };
+    let header_height = if inner.height >= 8 { 2 } else { 1 };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(header_height), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Length(1), // Divider
+            Constraint::Min(1),    // Playlists
+        ])
         .split(inner);
 
     let user_name = if app.home_sidebar.user_name.trim().is_empty() {
         match app.config.language {
-            Language::Zh => "未识别用户".to_string(),
-            Language::En => "Unknown User".to_string(),
+            Language::Zh => "未登录用户".to_string(),
+            Language::En => "Guest User".to_string(),
         }
     } else {
         app.home_sidebar.user_name.clone()
@@ -423,14 +427,23 @@ fn draw_home_sidebar(frame: &mut Frame, app: &mut App, area: Rect) {
         )));
     }
     frame.render_widget(
-        Paragraph::new(header_lines).wrap(Wrap { trim: true }),
+        Paragraph::new(header_lines)
+            .wrap(Wrap { trim: true })
+            .alignment(Alignment::Center),
         chunks[0],
+    );
+
+    // Draw horizontal divider line
+    let divider_line = "─".repeat(usize::from(inner.width));
+    frame.render_widget(
+        Paragraph::new(divider_line).style(Style::default().fg(app.theme.color_buff())),
+        chunks[1],
     );
 
     let sections = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(chunks[1]);
+        .split(chunks[2]);
 
     let created_items = app.home_sidebar.created_playlists.clone();
     let collected_items = app.home_sidebar.collected_playlists.clone();
