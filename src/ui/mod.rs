@@ -108,15 +108,15 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Horizontal)
         .constraints(if show_full_header {
             [
-                Constraint::Length(35),
-                Constraint::Min(10),
-                Constraint::Length(25),
+                Constraint::Length(30),
+                Constraint::Min(20),
+                Constraint::Length(15),
             ]
         } else {
             [
                 Constraint::Min(10),
                 Constraint::Length(0),
-                Constraint::Length(25),
+                Constraint::Length(15),
             ]
         })
         .split(inner);
@@ -130,8 +130,7 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         let active_idx = match app.page {
             Page::Home => 0,
             Page::Playlist => 1,
-            Page::Author => 2,
-            Page::Search => 3,
+            Page::Search => 2,
             _ => 99,
         };
 
@@ -139,14 +138,12 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
             crate::data::config::Language::Zh => vec![
                 (0, " 󰎆 发现 "),
                 (1, " 󰓇 歌单 "),
-                (2, " 󰀄 歌手 "),
-                (3, " 🔍 搜索 "),
+                (2, " 🔍 搜索 "),
             ],
             crate::data::config::Language::En => vec![
                 (0, " 󰎆 Discover "),
                 (1, " 󰓇 Playlist "),
-                (2, " 󰀄 Artist "),
-                (3, " 🔍 Search "),
+                (2, " 🔍 Search "),
             ],
         };
 
@@ -157,19 +154,11 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
             }
             if idx == active_idx {
                 tab_spans.push(Span::styled(
-                    "[",
-                    with_bar_bg(Style::default().fg(app.theme.color_accent())),
-                ));
-                tab_spans.push(Span::styled(
                     label,
                     Style::default()
                         .fg(app.theme.color_base())
                         .bg(app.theme.color_accent())
                         .add_modifier(Modifier::BOLD),
-                ));
-                tab_spans.push(Span::styled(
-                    "]",
-                    with_bar_bg(Style::default().fg(app.theme.color_accent())),
                 ));
             } else {
                 tab_spans.push(Span::styled(
