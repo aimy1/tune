@@ -11,6 +11,7 @@ pub enum ColorCapability {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeName {
     System,
+    Hyprland,
     Latte,
     Frappe,
     Macchiato,
@@ -20,6 +21,7 @@ pub enum ThemeName {
 impl ThemeName {
     pub fn from_str_or_system(raw: &str) -> Self {
         match raw.to_lowercase().as_str() {
+            "hyprland" => Self::Hyprland,
             "latte" => Self::Latte,
             "frappe" => Self::Frappe,
             "macchiato" => Self::Macchiato,
@@ -94,17 +96,17 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            name: ThemeName::System,
+            name: ThemeName::Hyprland,
             capability: detect_color_capability(),
             palette: ThemePalette {
-                text: (255, 255, 255),
-                subtext: (170, 170, 170),
-                base: (0, 0, 0),
-                surface: (32, 32, 32),
-                buff: (42, 42, 42),
-                accent: (255, 255, 255),
-                accent2: (255, 255, 255),
-                accent3: (255, 255, 255),
+                text: (242, 244, 248),
+                subtext: (148, 156, 187),
+                base: (17, 17, 27),
+                surface: (24, 24, 37),
+                buff: (42, 43, 61),
+                accent: (51, 204, 255),  // Hyprland Cyan #33CCFF
+                accent2: (0, 255, 153),  // Hyprland Emerald #00FF99
+                accent3: (203, 166, 247), // Hyprland / Noctalia Purple #CBA6F7
             },
         }
     }

@@ -283,10 +283,10 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         let mut spans = Vec::new();
         let played_style = with_bar_bg(
             Style::default()
-                .fg(app.theme.color_accent3())
+                .fg(app.theme.color_accent2())
                 .add_modifier(Modifier::BOLD),
         );
-        let buffer_style = with_bar_bg(Style::default().fg(app.theme.color_subtext()));
+        let buffer_style = with_bar_bg(Style::default().fg(app.theme.color_accent()));
         let empty_track = with_bar_bg(Style::default().fg(app.theme.color_buff()));
 
         if buffer_filled == 0 {

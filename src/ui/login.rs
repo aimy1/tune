@@ -20,7 +20,7 @@ pub fn draw_login(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Block::default().style(base_bg_style(app)), size);
 
-    let title_height = (size.height / 3).max(3);
+    let title_height = (size.height / 4).clamp(3, 7);
     let hint_height = 1;
     let form_height_zone = size.height.saturating_sub(title_height + hint_height);
 
@@ -47,19 +47,14 @@ pub fn draw_login(frame: &mut Frame, app: &App) {
         title_area,
     );
 
-    let login_content = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(56), Constraint::Percentage(44)])
-        .split(areas[1]);
-
-    let form_height = form_height(app.login.method).min(login_content[0].height);
-    let form_width = login_content[0].width.saturating_sub(2).clamp(28, 72);
-    let form_area = centered_rect(form_width.saturating_add(2), form_height.saturating_add(2), login_content[0]);
+    let card_height = form_height(app.login.method).min(areas[1].height);
+    let card_width = 60.min(areas[1].width.saturating_sub(2));
+    let form_area = centered_rect(card_width, card_height, areas[1]);
 
     let form_title = match app.login.method {
-        LoginMethod::Qr => lang_text(app, " 二维码登录 ", " QR Login "),
-        LoginMethod::Username => lang_text(app, " 账户登录 ", " Account Login "),
-        LoginMethod::Phone => lang_text(app, " 手机登录 ", " Phone Login "),
+        LoginMethod::Qr => lang_text(app, " 📱 扫码登录 ", " 📱 QR Login "),
+        LoginMethod::Username => lang_text(app, " 󰀄 账户登录 ", " 󰀄 Account Login "),
+        LoginMethod::Phone => lang_text(app, " 󰌘 手机登录 ", " 󰌘 Phone Login "),
     };
 
     let block = Block::default()
@@ -80,13 +75,15 @@ pub fn draw_login(frame: &mut Frame, app: &App) {
         vertical: 1,
     });
 
-    let content = Paragraph::new(build_form_lines(app))
-        .style(Style::default().fg(app.theme.color_text()).bg(app.theme.color_surface()))
-        .alignment(Alignment::Left)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(content, inner);
-
-    render_qr(frame, app, login_content[1]);
+    if app.login.method == LoginMethod::Qr {
+        render_qr_login_card(frame, app, inner);
+    } else {
+        let content = Paragraph::new(build_form_lines(app))
+            .style(Style::default().fg(app.theme.color_text()).bg(app.theme.color_surface()))
+            .alignment(Alignment::Left)
+            .wrap(Wrap { trim: true });
+        frame.render_widget(content, inner);
+    }
 
     let hint_cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -144,10 +141,128 @@ fn opening_title_block(custom: &str) -> String {
 
 fn form_height(method: LoginMethod) -> u16 {
     match method {
-        LoginMethod::Qr => 8,
+        LoginMethod::Qr => 26,
         LoginMethod::Username => 9,
         LoginMethod::Phone => 10,
     }
+}
+
+fn get_qr_url(app: &App) -> String {
+    let url = app.login.qr_url.trim();
+    if !url.is_empty() {
+        return url.to_string();
+    }
+    let key = app.login.qr_key.trim();
+    if !key.is_empty() {
+        if key.starts_with("http://") || key.starts_with("https://") {
+            return key.to_string();
+        } else {
+            return format!("https://music.163.com/login?codekey={}", key);
+        }
+    }
+    String::new()
+}
+
+fn render_qr_login_card(frame: &mut Frame, app: &App, area: Rect) {
+    let url = get_qr_url(app);
+    let payload = if !url.is_empty() {
+        url.as_str()
+    } else {
+        app.login.qr_key.trim()
+    };
+
+    let has_url = !url.is_empty();
+    let url_height = if has_url { 2 } else { 0 };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(14),
+            Constraint::Length(1),
+            Constraint::Length(url_height),
+            Constraint::Length(3),
+        ])
+        .split(area);
+
+    if payload.is_empty() {
+        let msg = match app.config.language {
+            Language::Zh => "\n󰐑 正在获取二维码...\n(按 F1 刷新)",
+            Language::En => "\n󰐑 Generating QR...\n(Press F1 to refresh)",
+        };
+        frame.render_widget(
+            Paragraph::new(msg)
+                .style(Style::default().fg(app.theme.color_subtext()))
+                .alignment(Alignment::Center),
+            chunks[0],
+        );
+    } else if let Ok(code) = QrCode::new(payload.as_bytes()) {
+        let image = code
+            .render::<unicode::Dense1x2>()
+            .quiet_zone(false)
+            .dark_color(unicode::Dense1x2::Dark)
+            .light_color(unicode::Dense1x2::Light)
+            .build();
+
+        frame.render_widget(
+            Paragraph::new(image)
+                .style(Style::default().fg(app.theme.color_text()))
+                .alignment(Alignment::Center),
+            chunks[0],
+        );
+    }
+
+    let hint = match app.config.language {
+        Language::Zh => "请使用 网易云音乐 App 扫描二维码",
+        Language::En => "Scan with NetEase Music App",
+    };
+    frame.render_widget(
+        Paragraph::new(hint)
+            .style(
+                Style::default()
+                    .fg(app.theme.color_accent2())
+                    .add_modifier(Modifier::BOLD),
+            )
+            .alignment(Alignment::Center),
+        chunks[1],
+    );
+
+    if has_url {
+        let url_text = format!("🔗 链接: {}", url);
+        frame.render_widget(
+            Paragraph::new(url_text)
+                .style(Style::default().fg(app.theme.color_accent()))
+                .alignment(Alignment::Center)
+                .wrap(Wrap { trim: true }),
+            chunks[2],
+        );
+    }
+
+    let mut button_lines = Vec::new();
+    push_action_line(
+        &mut button_lines,
+        app,
+        0,
+        format!("󰐑 {}", lang_text(app, "刷新二维码", "Refresh QR")),
+        app.login.focus_index == 0,
+    );
+    push_action_line(
+        &mut button_lines,
+        app,
+        1,
+        format!(
+            "󰦏 {}",
+            lang_text(app, "已扫码，确认登录", "Scanned, Confirm Login")
+        ),
+        app.login.focus_index == 1,
+    );
+
+    let btn_chunk_idx = if has_url { 3 } else { 2 };
+    frame.render_widget(
+        Paragraph::new(button_lines)
+            .style(Style::default().fg(app.theme.color_text()))
+            .alignment(Alignment::Center),
+        chunks[btn_chunk_idx],
+    );
 }
 
 fn current_login_method_text(app: &App, method: LoginMethod) -> &'static str {
@@ -264,39 +379,7 @@ fn build_form_lines(app: &App) -> Vec<Line<'static>> {
     lines
 }
 
-fn render_qr(frame: &mut Frame, app: &App, area: Rect) {
-    if app.login.method != LoginMethod::Qr || area.width < 10 || area.height < 6 {
-        return;
-    }
 
-    let payload = if !app.login.qr_url.trim().is_empty() {
-        app.login.qr_url.trim()
-    } else {
-        app.login.qr_key.trim()
-    };
-
-    if payload.is_empty() {
-        return;
-    }
-
-    let Ok(code) = QrCode::new(payload.as_bytes()) else {
-        return;
-    };
-
-    let image = code
-        .render::<unicode::Dense1x2>()
-        .quiet_zone(false)
-        .dark_color(unicode::Dense1x2::Dark)
-        .light_color(unicode::Dense1x2::Light)
-        .build();
-
-    frame.render_widget(
-        Paragraph::new(image)
-            .style(Style::default().fg(app.theme.color_text()))
-            .alignment(Alignment::Center),
-        area,
-    );
-}
 
 fn push_action_line(
     lines: &mut Vec<Line<'static>>,

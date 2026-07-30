@@ -26,6 +26,7 @@ impl ThemeLoader {
 
         let rel = match name {
             ThemeName::System => PathBuf::from("themes/system.toml"),
+            ThemeName::Hyprland => PathBuf::from("themes/hyprland.toml"),
             ThemeName::Latte => PathBuf::from("themes/catppuccin_latte.toml"),
             ThemeName::Frappe => PathBuf::from("themes/catppuccin_frappe.toml"),
             ThemeName::Macchiato => PathBuf::from("themes/catppuccin_macchiato.toml"),

@@ -1,4 +1,4 @@
-theme = "frappe"
+theme = "hyprland"
 ui_fps = 30
 spectrum_hz = 60
 mpris_poll_ms = 100

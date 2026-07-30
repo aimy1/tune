@@ -1,0 +1,10 @@
+name = "hyprland"
+
+text = "#F2F4F8"
+subtext = "#949CBB"
+base = "#11111B"
+surface = "#181825"
+buff = "#2A2B3D"
+accent = "#33CCFF"
+accent2 = "#00FF99"
+accent3 = "#CBA6F7"

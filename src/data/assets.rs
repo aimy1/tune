@@ -8,6 +8,7 @@ const ENV_ASSET_DIR: &str = "TUNE_ASSET_DIR";
 const DEFAULT_CONFIG_TOML: &str = include_str!("../../config/default.toml");
 
 const THEME_SYSTEM_TOML: &str = include_str!("../../themes/system.toml");
+const THEME_HYPRLAND_TOML: &str = include_str!("../../themes/hyprland.toml");
 const THEME_LATTE_TOML: &str = include_str!("../../themes/catppuccin_latte.toml");
 const THEME_FRAPPE_TOML: &str = include_str!("../../themes/catppuccin_frappe.toml");
 const THEME_MACCHIATO_TOML: &str = include_str!("../../themes/catppuccin_macchiato.toml");
@@ -108,6 +109,7 @@ fn ensure_themes(root: &Path) -> Result<()> {
     ensure_dir(&root.join("themes"))?;
 
     write_if_missing(&root.join("themes/system.toml"), THEME_SYSTEM_TOML)?;
+    write_if_missing(&root.join("themes/hyprland.toml"), THEME_HYPRLAND_TOML)?;
     write_if_missing(&root.join("themes/catppuccin_latte.toml"), THEME_LATTE_TOML)?;
     write_if_missing(
         &root.join("themes/catppuccin_frappe.toml"),
