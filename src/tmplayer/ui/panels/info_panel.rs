@@ -361,10 +361,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
                 },
             );
         }
-        let al = Paragraph::new(clip_to_display_width(album, meta_rect.width as usize))
-            .style(sub_style)
-            .alignment(Alignment::Left);
-        if l.meta.height >= 3 {
+        let show_album = !album.trim().is_empty()
+            && album.trim().to_lowercase() != title.trim().to_lowercase();
+        if l.meta.height >= 3 && show_album {
+            let al = Paragraph::new(clip_to_display_width(album, meta_rect.width as usize))
+                .style(sub_style)
+                .alignment(Alignment::Left);
             f.render_widget(
                 al,
                 Rect {
