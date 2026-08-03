@@ -1,101 +1,106 @@
 use crate::tmplayer::app::state::AppState;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-const BLOCK_LEVELS: [char; 7] = ['█', '▇', '▆', '▅', '▄', '▃', '▂'];
-
 pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
-    let w = area.width as usize;
-    let h = area.height as usize;
-    if w == 0 || h == 0 {
+    let w_cells = area.width as usize;
+    let h_cells = area.height as usize;
+    if w_cells == 0 || h_cells == 0 {
         return;
     }
 
-    let mid_row = h / 2;
-    let max_half_h = mid_row.max(1);
+    let w_px = w_cells * 2;
+    let h_px = h_cells * 4;
+    if w_px == 0 || h_px == 0 {
+        return;
+    }
+
+    let mid_y = ((h_px as i32) - 1) / 2;
+    let max_amp = (mid_y.max(1) as f32) * 0.92;
     let bars = &app.spectrum.bars;
     let num_bars = bars.len().max(1);
 
-    let mut grid = vec![(' ', app.theme.color_subtext()); w * h];
+    let mut cell_bits = vec![0u8; w_cells * h_cells];
 
-    // 1. Draw glowing laser horizon line across the exact center
-    for col in 0..w {
-        let idx = mid_row * w + col;
-        if idx < grid.len() {
-            grid[idx] = ('━', app.theme.color_text());
-        }
-    }
-
-    // 2. Draw symmetric mirrored frequency bars expanding upwards & downwards
-    for col in 0..w {
-        let bar_idx = (col * num_bars) / w;
+    for x_px in 0..w_px {
+        let bar_idx = (x_px * num_bars) / w_px;
         let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-        let bar_h = (val * max_half_h as f32).round() as usize;
+        let amp = (val * max_amp).round() as i32;
 
-        if bar_h > 0 {
-            for dy in 1..=bar_h {
-                let ratio = dy as f32 / max_half_h as f32;
-                let char_idx = (ratio * (BLOCK_LEVELS.len() - 1) as f32)
-                    .round()
-                    .clamp(0.0, (BLOCK_LEVELS.len() - 1) as f32) as usize;
+        let y_top = (mid_y - amp).max(0);
+        let y_bottom = (mid_y + amp).min(h_px as i32 - 1);
 
-                let is_peak = dy == bar_h;
-                let (sym_up, sym_down) = if is_peak {
-                    ('▔', ' ')
-                } else {
-                    (BLOCK_LEVELS[char_idx], BLOCK_LEVELS[char_idx])
-                };
+        for py in y_top..=y_bottom {
+            let cell_x = x_px / 2;
+            let cell_y = (py as usize) / 4;
+            let sub_x = x_px % 2;
+            let sub_y = (py as usize) % 4;
 
-                let color_up = if is_peak {
-                    app.theme.color_text()
-                } else if dy > max_half_h / 2 {
-                    app.theme.color_accent3()
-                } else {
-                    app.theme.color_accent()
-                };
-
-                let color_down = if is_peak {
-                    app.theme.color_text()
-                } else if dy > max_half_h / 2 {
-                    app.theme.color_accent2()
-                } else {
-                    app.theme.color_subtext()
-                };
-
-                // Upward bar (Warm Fire palette)
-                if mid_row >= dy {
-                    let up_row = mid_row - dy;
-                    let idx = up_row * w + col;
-                    if idx < grid.len() {
-                        grid[idx] = (sym_up, color_up);
-                    }
-                }
-
-                // Downward mirrored bar (Cool Ice palette)
-                let down_row = mid_row + dy;
-                if down_row < h {
-                    let idx = down_row * w + col;
-                    if idx < grid.len() {
-                        grid[idx] = (sym_down, color_down);
-                    }
-                }
+            let bit = braille_bit(sub_x, sub_y);
+            let idx = cell_y * w_cells + cell_x;
+            if idx < cell_bits.len() {
+                cell_bits[idx] |= bit;
             }
         }
     }
 
-    let mut lines: Vec<Line> = Vec::with_capacity(h);
-    for row in 0..h {
-        let mut spans: Vec<Span> = Vec::with_capacity(w);
-        let row_offset = row * w;
-        for col in 0..w {
-            let (ch, color) = grid[row_offset + col];
-            spans.push(Span::styled(ch.to_string(), Style::default().fg(color)));
+    let mut lines: Vec<Line> = Vec::with_capacity(h_cells);
+    for row in 0..h_cells {
+        let t = if h_cells <= 1 {
+            0.5
+        } else {
+            row as f32 / (h_cells - 1) as f32
+        };
+        let fg = if (t - 0.5).abs() < 0.15 {
+            app.theme.color_text()
+        } else if t < 0.5 {
+            mix(app.theme.color_accent(), app.theme.color_text(), t * 2.0)
+        } else {
+            mix(app.theme.color_text(), app.theme.color_accent2(), (t - 0.5) * 2.0)
+        };
+
+        let mut s = String::with_capacity(w_cells);
+        let base = row * w_cells;
+        for col in 0..w_cells {
+            let bits = cell_bits[base + col];
+            s.push(if bits == 0 {
+                ' '
+            } else {
+                char::from_u32(0x2800 + bits as u32).unwrap_or(' ')
+            });
         }
-        lines.push(Line::from(spans));
+        lines.push(Line::from(Span::styled(s, Style::default().fg(fg))));
     }
 
     f.render_widget(Paragraph::new(lines), area);
+}
+
+fn braille_bit(sub_x: usize, sub_y: usize) -> u8 {
+    match (sub_x, sub_y) {
+        (0, 0) => 0x01,
+        (0, 1) => 0x02,
+        (0, 2) => 0x04,
+        (0, 3) => 0x40,
+        (1, 0) => 0x08,
+        (1, 1) => 0x10,
+        (1, 2) => 0x20,
+        (1, 3) => 0x80,
+        _ => 0,
+    }
+}
+
+fn mix(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    match (a, b) {
+        (Color::Rgb(ar, ag, ab), Color::Rgb(br, bg, bb)) => {
+            let r = (ar as f32 + (br as f32 - ar as f32) * t) as u8;
+            let g = (ag as f32 + (bg as f32 - ag as f32) * t) as u8;
+            let b = (ab as f32 + (bb as f32 - ab as f32) * t) as u8;
+            Color::Rgb(r, g, b)
+        }
+        _ => a,
+    }
 }
