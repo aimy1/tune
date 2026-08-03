@@ -527,9 +527,18 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
             match app.config.visualize {
                 crate::tmplayer::data::config::VisualizeMode::Off => lang_text(app, "关闭", "Off"),
                 crate::tmplayer::data::config::VisualizeMode::Bars =>
-                    lang_text(app, "频谱", "Bars"),
+                    lang_text(app, "柱状频谱", "Bars"),
                 crate::tmplayer::data::config::VisualizeMode::Oscilloscope => {
-                    lang_text(app, "示波器", "Oscilloscope")
+                    lang_text(app, "示波波形", "Oscilloscope")
+                }
+                crate::tmplayer::data::config::VisualizeMode::Circle => {
+                    lang_text(app, "环形频谱", "Circle Spectrum")
+                }
+                crate::tmplayer::data::config::VisualizeMode::Particles => {
+                    lang_text(app, "电光粒子", "Particle Wave")
+                }
+                crate::tmplayer::data::config::VisualizeMode::Mirror => {
+                    lang_text(app, "双向镜像", "Symmetric Mirror")
                 }
             }
         ),

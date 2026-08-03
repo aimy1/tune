@@ -601,8 +601,7 @@ impl AppState {
         if self.player.playback == PlaybackState::Playing {
             match self.config.visualize {
                 crate::tmplayer::data::config::VisualizeMode::Off => {}
-                crate::tmplayer::data::config::VisualizeMode::Bars
-                | crate::tmplayer::data::config::VisualizeMode::Oscilloscope => {
+                _ => {
                     return self.config.spectrum_hz.clamp(base, 60);
                 }
             }
@@ -611,8 +610,7 @@ impl AppState {
         if self.player.playback == PlaybackState::Paused && self.has_spectrum_tail_motion() {
             match self.config.visualize {
                 crate::tmplayer::data::config::VisualizeMode::Off => {}
-                crate::tmplayer::data::config::VisualizeMode::Bars
-                | crate::tmplayer::data::config::VisualizeMode::Oscilloscope => {
+                _ => {
                     return self.config.spectrum_hz.clamp(base, 60);
                 }
             }

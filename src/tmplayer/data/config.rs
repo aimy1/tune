@@ -144,14 +144,20 @@ pub enum VisualizeMode {
     Off,
     Bars,
     Oscilloscope,
+    Circle,
+    Particles,
+    Mirror,
 }
 
 impl VisualizeMode {
     pub fn cycle(self, delta: i32) -> Self {
-        const MODES: [VisualizeMode; 3] = [
+        const MODES: [VisualizeMode; 6] = [
             VisualizeMode::Off,
             VisualizeMode::Bars,
             VisualizeMode::Oscilloscope,
+            VisualizeMode::Circle,
+            VisualizeMode::Particles,
+            VisualizeMode::Mirror,
         ];
 
         let index = MODES.iter().position(|mode| *mode == self).unwrap_or(1) as i32;

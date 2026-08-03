@@ -177,8 +177,11 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             l(app, "可视化", "Visualization"),
             match app.config.visualize {
                 VisualizeMode::Off => l(app, "关闭", "Off").to_string(),
-                VisualizeMode::Bars => l(app, "频谱", "Bars").to_string(),
-                VisualizeMode::Oscilloscope => l(app, "示波器", "Oscilloscope").to_string(),
+                VisualizeMode::Bars => l(app, "柱状频谱", "Bars").to_string(),
+                VisualizeMode::Oscilloscope => l(app, "示波波形", "Oscilloscope").to_string(),
+                VisualizeMode::Circle => l(app, "环形频谱", "Circle Spectrum").to_string(),
+                VisualizeMode::Particles => l(app, "电光粒子", "Particle Wave").to_string(),
+                VisualizeMode::Mirror => l(app, "双向镜像", "Symmetric Mirror").to_string(),
             }
         ),
         (

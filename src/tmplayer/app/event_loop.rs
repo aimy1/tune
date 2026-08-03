@@ -168,6 +168,9 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
             VisualizeMode::Off => crate::data::config::VisualizeMode::Off,
             VisualizeMode::Bars => crate::data::config::VisualizeMode::Bars,
             VisualizeMode::Oscilloscope => crate::data::config::VisualizeMode::Oscilloscope,
+            VisualizeMode::Circle => crate::data::config::VisualizeMode::Circle,
+            VisualizeMode::Particles => crate::data::config::VisualizeMode::Particles,
+            VisualizeMode::Mirror => crate::data::config::VisualizeMode::Mirror,
         },
         super_smooth_bar: app.config.super_smooth_bar,
         bars_gap: app.config.bars_gap,
@@ -223,6 +226,9 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
         crate::data::config::VisualizeMode::Off => VisualizeMode::Off,
         crate::data::config::VisualizeMode::Bars => VisualizeMode::Bars,
         crate::data::config::VisualizeMode::Oscilloscope => VisualizeMode::Oscilloscope,
+        crate::data::config::VisualizeMode::Circle => VisualizeMode::Circle,
+        crate::data::config::VisualizeMode::Particles => VisualizeMode::Particles,
+        crate::data::config::VisualizeMode::Mirror => VisualizeMode::Mirror,
     };
     app.config.super_smooth_bar = config.super_smooth_bar;
     app.config.bars_gap = config.bars_gap;
@@ -725,7 +731,10 @@ pub async fn run(
 
             match app.config.visualize {
                 VisualizeMode::Off => clear_spectrum(app),
-                VisualizeMode::Bars => {
+                VisualizeMode::Bars
+                | VisualizeMode::Circle
+                | VisualizeMode::Particles
+                | VisualizeMode::Mirror => {
                     if let Some(c) = cava.as_ref() {
                         let (l, r) = c.latest_stereo_bars();
                         app.spectrum.bars_left = l;
@@ -2073,7 +2082,10 @@ fn desired_bar_count(app: &AppState, layout: &UiLayout) -> usize {
 fn desired_cava_config(app: &AppState, layout: &UiLayout) -> Option<CavaConfig> {
     match app.config.visualize {
         VisualizeMode::Off => None,
-        VisualizeMode::Bars => Some({
+        VisualizeMode::Bars
+        | VisualizeMode::Circle
+        | VisualizeMode::Particles
+        | VisualizeMode::Mirror => Some({
             let bars = desired_bar_count(app, layout);
             CavaConfig {
                 framerate_hz: app.config.spectrum_hz,
