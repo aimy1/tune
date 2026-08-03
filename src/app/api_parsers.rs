@@ -201,6 +201,29 @@ pub fn extract_current_user_name(response: &ApiResponse) -> Option<String> {
     None
 }
 
+pub fn extract_current_user_avatar(response: &ApiResponse) -> Option<String> {
+    for pointer in [
+        "/profile/avatarUrl",
+        "/data/profile/avatarUrl",
+        "/account/avatarUrl",
+        "/data/account/avatarUrl",
+        "/profile/backgroundUrl",
+    ] {
+        if let Some(url) = response
+            .body
+            .pointer(pointer)
+            .and_then(|value| value.as_str())
+        {
+            let url = url.trim();
+            if !url.is_empty() {
+                return Some(url.to_string());
+            }
+        }
+    }
+
+    None
+}
+
 pub fn parse_tracks(items: &[Value]) -> Vec<PlaylistTrack> {
     let mut tracks = Vec::new();
 

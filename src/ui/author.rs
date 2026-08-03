@@ -193,7 +193,9 @@ fn draw_author_header(frame: &mut Frame, app: &mut App, area: Rect) {
         cursor_y = cursor_y.saturating_add(description_height);
     }
 
-    if cursor_y < info_area.y + info_area.height {
+    if cursor_y < info_area.y + info_area.height
+        && (hot_count > 0 || album_count > 0 || ep_count > 0 || single_count > 0)
+    {
         frame.render_widget(
             Paragraph::new(format!(
                 "{} {}  |  {} {}  |  EP {}  |  Single {}",

@@ -578,6 +578,7 @@ pub struct HomeSidebarState {
     pub user_id: Option<String>,
     pub liked_playlist_id: Option<String>,
     pub user_name: String,
+    pub user_avatar_url: Option<String>,
     pub created_playlists: Vec<HomeSidebarPlaylist>,
     pub collected_playlists: Vec<HomeSidebarPlaylist>,
     pub focused_section: HomeSidebarSection,
@@ -598,6 +599,7 @@ impl Default for HomeSidebarState {
             user_id: None,
             liked_playlist_id: None,
             user_name: String::new(),
+            user_avatar_url: None,
             created_playlists: Vec::new(),
             collected_playlists: Vec::new(),
             focused_section: HomeSidebarSection::Created,
@@ -4472,7 +4474,9 @@ impl App {
         }.to_string();
 
         let mut cover = CoverFetchState::default();
-        if let Some(first_url) = tiles.first().and_then(|t| t.cover.url.clone()) {
+        if let Some(avatar_url) = &self.home_sidebar.user_avatar_url {
+            cover.load(self.api.clone(), avatar_url.clone());
+        } else if let Some(first_url) = tiles.first().and_then(|t| t.cover.url.clone()) {
             cover.load(self.api.clone(), first_url);
         }
 
@@ -5674,9 +5678,12 @@ impl App {
             let created_playlists = parse_home_sidebar_playlists(&created_response);
             let collected_playlists = parse_home_sidebar_playlists(&collected_response);
 
+            let user_avatar_url = extract_current_user_avatar(&account);
+
             self.home_sidebar.user_id = Some(uid);
             self.home_sidebar.liked_playlist_id = extract_liked_playlist_id(&account);
             self.home_sidebar.user_name = user_name;
+            self.home_sidebar.user_avatar_url = user_avatar_url;
             self.home_sidebar.created_playlists = created_playlists;
             self.home_sidebar.collected_playlists = collected_playlists;
             self.home_sidebar.clamp_focus();
