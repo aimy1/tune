@@ -1,94 +1,297 @@
 use crate::tmplayer::app::state::AppState;
+use crate::tmplayer::data::config::BarChannels;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
-    let w_cells = area.width as usize;
-    let h_cells = area.height as usize;
-    if w_cells == 0 || h_cells == 0 {
+pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
+    let h = area.height as usize;
+    let w = area.width as usize;
+    if h == 0 || w == 0 {
         return;
     }
 
-    let w_px = w_cells * 2;
-    let h_px = h_cells * 4;
-    if w_px == 0 || h_px == 0 {
-        return;
-    }
+    let mid_row = h / 2;
+    let max_half_h = mid_row.max(1);
 
-    let mid_y = ((h_px as i32) - 1) / 2;
-    let max_amp = (mid_y.max(1) as f32) * 0.92;
     let bars = &app.spectrum.bars;
-    let num_bars = bars.len().max(1);
+    let mono_count = bars.len().max(1);
+    if app.spectrum_render_grid.len() != h {
+        app.spectrum_render_grid.resize_with(h, Vec::new);
+    }
+    for row in &mut app.spectrum_render_grid {
+        if row.len() != w {
+            row.resize(w, ' ');
+        } else {
+            row.fill(' ');
+        }
+    }
 
-    let mut cell_bits = vec![0u8; w_cells * h_cells];
+    let (bar_widths, gap_width, draw_total, x_offset) =
+        compute_bar_layout(w, app.config.bars_gap, mono_count, app.config.bar_channels);
+    if draw_total == 0 || bar_widths.is_empty() {
+        return;
+    }
 
-    for x_px in 0..w_px {
-        let bar_idx = (x_px * num_bars) / w_px;
-        let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-        let amp = (val * max_amp).round() as i32;
+    let draw_vals = build_display_vals(
+        bars,
+        draw_total,
+        app.config.bar_channels,
+        app.config.bar_channel_reverse,
+    );
 
-        let y_top = (mid_y - amp).max(0);
-        let y_bottom = (mid_y + amp).min(h_px as i32 - 1);
+    let mut x_cursor = x_offset.min(w);
+    for (i, &val) in draw_vals.iter().enumerate() {
+        if x_cursor >= w {
+            break;
+        }
+        let bar_width = bar_widths.get(i).copied().unwrap_or(1);
+        let val = apply_height_curve(val);
 
-        for py in y_top..=y_bottom {
-            let cell_x = x_px / 2;
-            let cell_y = (py as usize) / 4;
-            let sub_x = x_px % 2;
-            let sub_y = (py as usize) % 4;
+        if app.config.super_smooth_bar {
+            let fill = val * max_half_h as f32;
+            let full = fill.floor().clamp(0.0, max_half_h as f32) as usize;
+            let frac = (fill - full as f32).clamp(0.0, 1.0);
 
-            let bit = braille_bit(sub_x, sub_y);
-            let idx = cell_y * w_cells + cell_x;
-            if idx < cell_bits.len() {
-                cell_bits[idx] |= bit;
+            for y in 0..=max_half_h {
+                let ch = if y < full {
+                    '█'
+                } else if y == full {
+                    smooth_char(frac)
+                } else {
+                    ' '
+                };
+
+                if ch != ' ' {
+                    for x in x_cursor..(x_cursor + bar_width).min(w) {
+                        if mid_row >= y {
+                            app.spectrum_render_grid[mid_row - y][x] = ch;
+                        }
+                        if mid_row + y < h {
+                            app.spectrum_render_grid[mid_row + y][x] = ch;
+                        }
+                    }
+                }
+            }
+        } else {
+            let bar_h = (val * max_half_h as f32).round() as usize;
+            for y in 0..bar_h.min(max_half_h) {
+                let ch = density_char(y, bar_h.max(1));
+                for x in x_cursor..(x_cursor + bar_width).min(w) {
+                    if mid_row >= y {
+                        app.spectrum_render_grid[mid_row - y][x] = ch;
+                    }
+                    if mid_row + y < h {
+                        app.spectrum_render_grid[mid_row + y][x] = ch;
+                    }
+                }
             }
         }
+
+        x_cursor = x_cursor.saturating_add(bar_width);
+        if i + 1 < draw_total {
+            x_cursor = x_cursor.saturating_add(gap_width);
+        }
     }
 
-    let mut lines: Vec<Line> = Vec::with_capacity(h_cells);
-    for row in 0..h_cells {
-        let t = if h_cells <= 1 {
-            0.5
-        } else {
-            row as f32 / (h_cells - 1) as f32
-        };
-        let fg = if (t - 0.5).abs() < 0.15 {
+    // Render per-line vertical gradient using theme colors.
+    let mut lines: Vec<Line> = Vec::with_capacity(h);
+    for (row_idx, row) in app.spectrum_render_grid.iter().enumerate() {
+        let fg = if row_idx == mid_row {
             app.theme.color_text()
-        } else if t < 0.5 {
-            mix(app.theme.color_accent(), app.theme.color_text(), t * 2.0)
+        } else if row_idx < mid_row {
+            let t = if mid_row == 0 {
+                1.0
+            } else {
+                row_idx as f32 / mid_row as f32
+            };
+            mix(app.theme.color_accent2(), app.theme.color_text(), t)
         } else {
-            mix(app.theme.color_text(), app.theme.color_accent2(), (t - 0.5) * 2.0)
+            let t = if h - 1 == mid_row {
+                0.0
+            } else {
+                (row_idx - mid_row) as f32 / (h - 1 - mid_row) as f32
+            };
+            mix(app.theme.color_text(), app.theme.color_accent3(), t)
         };
 
-        let mut s = String::with_capacity(w_cells);
-        let base = row * w_cells;
-        for col in 0..w_cells {
-            let bits = cell_bits[base + col];
-            s.push(if bits == 0 {
-                ' '
-            } else {
-                char::from_u32(0x2800 + bits as u32).unwrap_or(' ')
-            });
-        }
+        let s = row.iter().collect::<String>();
         lines.push(Line::from(Span::styled(s, Style::default().fg(fg))));
     }
 
     f.render_widget(Paragraph::new(lines), area);
 }
 
-fn braille_bit(sub_x: usize, sub_y: usize) -> u8 {
-    match (sub_x, sub_y) {
-        (0, 0) => 0x01,
-        (0, 1) => 0x02,
-        (0, 2) => 0x04,
-        (0, 3) => 0x40,
-        (1, 0) => 0x08,
-        (1, 1) => 0x10,
-        (1, 2) => 0x20,
-        (1, 3) => 0x80,
-        _ => 0,
+fn compute_bar_layout(
+    width: usize,
+    gap: bool,
+    data_len: usize,
+    mode: BarChannels,
+) -> (Vec<usize>, usize, usize, usize) {
+    if width == 0 {
+        return (Vec::new(), 0, 0, 0);
+    }
+
+    let mut desired_total = match mode {
+        BarChannels::Mono => data_len,
+        BarChannels::Stereo => data_len.saturating_mul(2),
+    };
+
+    let max_total = if gap {
+        width.div_ceil(2).max(1)
+    } else {
+        (width / 2).max(1)
+    };
+    if desired_total > max_total {
+        desired_total = max_total;
+    }
+    if mode == BarChannels::Stereo && desired_total % 2 == 1 {
+        desired_total = desired_total.saturating_sub(1).max(2);
+    }
+
+    let mut bars = desired_total.max(1);
+    loop {
+        if !gap {
+            let bar_w = width / bars;
+            if bar_w >= 2 {
+                let used = bars * bar_w;
+                let mut widths = vec![bar_w; bars];
+                let mut remainder = width.saturating_sub(used);
+                for w in &mut widths {
+                    if remainder == 0 {
+                        break;
+                    }
+                    *w += 1;
+                    remainder -= 1;
+                }
+                let used = widths.iter().sum::<usize>();
+                let offset = width.saturating_sub(used) / 2;
+                return (widths, 0, bars, offset);
+            }
+        } else {
+            let mut bar_w = width / bars;
+            while bar_w >= 1 {
+                let gap_w = bar_w.div_ceil(2);
+                let needed = bars * bar_w + (bars.saturating_sub(1)) * gap_w;
+                if needed <= width {
+                    let mut widths = vec![bar_w; bars];
+                    let mut remainder = width.saturating_sub(needed);
+                    for w in &mut widths {
+                        if remainder == 0 {
+                            break;
+                        }
+                        *w += 1;
+                        remainder -= 1;
+                    }
+                    let used = widths.iter().sum::<usize>() + (bars.saturating_sub(1)) * gap_w;
+                    let offset = width.saturating_sub(used) / 2;
+                    return (widths, gap_w, bars, offset);
+                }
+                if bar_w == 1 {
+                    break;
+                }
+                bar_w -= 1;
+            }
+        }
+
+        if bars <= 1 {
+            let used = width.max(1);
+            let offset = width.saturating_sub(used) / 2;
+            return (vec![used], 0, 1, offset);
+        }
+        bars -= 1;
+    }
+}
+
+fn build_display_vals(
+    data: &[f32],
+    draw_total: usize,
+    mode: BarChannels,
+    reverse: bool,
+) -> Vec<f32> {
+    let data_len = data.len().max(1);
+    if draw_total == 0 {
+        return Vec::new();
+    }
+
+    match mode {
+        BarChannels::Mono => (0..draw_total)
+            .map(|i| {
+                if reverse {
+                    sample_val(data, data_len, draw_total, draw_total - 1 - i)
+                } else {
+                    sample_val(data, data_len, draw_total, i)
+                }
+            })
+            .collect(),
+        BarChannels::Stereo => {
+            let per_side = (draw_total / 2).max(1);
+            let mut right: Vec<f32> = (0..per_side)
+                .map(|i| {
+                    if reverse {
+                        sample_val(data, data_len, per_side, per_side - 1 - i)
+                    } else {
+                        sample_val(data, data_len, per_side, i)
+                    }
+                })
+                .collect();
+            let mut left = right.clone();
+            left.reverse();
+            left.append(&mut right);
+            left
+        }
+    }
+}
+
+fn sample_val(data: &[f32], data_len: usize, draw_len: usize, i: usize) -> f32 {
+    let idx =
+        ((i as u32) * (data_len as u32) / (draw_len as u32)).min((data_len - 1) as u32) as usize;
+    data.get(idx).copied().unwrap_or(0.0).clamp(0.0, 1.0)
+}
+
+fn apply_height_curve(v: f32) -> f32 {
+    let v = v.clamp(0.0, 1.0);
+    v.powf(0.72)
+}
+
+fn density_char(level: usize, height: usize) -> char {
+    if height == 0 {
+        return ' ';
+    }
+    if height == 1 {
+        return '░';
+    }
+    let ratio = level as f32 / height as f32;
+    if ratio < 0.25 {
+        '█'
+    } else if ratio < 0.50 {
+        '▓'
+    } else if ratio < 0.75 {
+        '▒'
+    } else {
+        '░'
+    }
+}
+
+fn smooth_char(frac: f32) -> char {
+    if frac <= 0.0 {
+        ' '
+    } else if frac < 1.0 / 7.0 {
+        '▂'
+    } else if frac < 2.0 / 7.0 {
+        '▃'
+    } else if frac < 3.0 / 7.0 {
+        '▄'
+    } else if frac < 4.0 / 7.0 {
+        '▅'
+    } else if frac < 5.0 / 7.0 {
+        '▆'
+    } else if frac < 6.0 / 7.0 {
+        '▇'
+    } else {
+        '█'
     }
 }
 
