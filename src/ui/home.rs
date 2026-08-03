@@ -513,7 +513,7 @@ fn draw_home_sidebar_section(
     };
     if title_line_area.width > 2 {
         let title_icon = match section {
-            HomeSidebarSection::Created => " 󰓇 ",
+            HomeSidebarSection::Created => " 󰓏 ",
             HomeSidebarSection::Collected => " 󱉼 ",
         };
         let line_width = usize::from(title_line_area.width);
@@ -587,7 +587,7 @@ fn draw_home_sidebar_section(
                 " "
             } else {
                 match section {
-                    HomeSidebarSection::Created => "󰓇 ",
+                    HomeSidebarSection::Created => "󰓏 ",
                     HomeSidebarSection::Collected => "󱉼 ",
                 }
             };
