@@ -5,6 +5,8 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+const BLOCK_LEVELS: [char; 7] = ['█', '▇', '▆', '▅', '▄', '▃', '▂'];
+
 pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     let w = area.width as usize;
     let h = area.height as usize;
@@ -25,12 +27,22 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
         let bar_h = (val * max_half_h as f32).round() as usize;
 
         for dy in 0..bar_h {
-            let symbol = if dy == bar_h.saturating_sub(1) {
-                '▲'
+            let ratio = dy as f32 / max_half_h as f32;
+            let char_idx = (ratio * (BLOCK_LEVELS.len() - 1) as f32)
+                .round()
+                .clamp(0.0, (BLOCK_LEVELS.len() - 1) as f32) as usize;
+
+            let (sym_up, sym_down) = if dy == bar_h.saturating_sub(1) {
+                ('▲', '▼')
             } else {
-                '█'
+                (BLOCK_LEVELS[char_idx], BLOCK_LEVELS[char_idx])
             };
-            let color = if dy > max_half_h / 2 {
+
+            let color = if dy == bar_h.saturating_sub(1) {
+                app.theme.color_text()
+            } else if dy > max_half_h / 2 {
+                app.theme.color_accent3()
+            } else if dy > max_half_h / 4 {
                 app.theme.color_accent()
             } else {
                 app.theme.color_accent2()
@@ -41,18 +53,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
                 let up_row = mid_row - dy;
                 let idx = up_row * w + col;
                 if idx < grid.len() {
-                    grid[idx] = (symbol, color);
+                    grid[idx] = (sym_up, color);
                 }
             }
 
             // Downward mirrored bar
             let down_row = mid_row + dy;
             if down_row < h {
-                let sym_down = if dy == bar_h.saturating_sub(1) {
-                    '▼'
-                } else {
-                    '█'
-                };
                 let idx = down_row * w + col;
                 if idx < grid.len() {
                     grid[idx] = (sym_down, color);

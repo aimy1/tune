@@ -5,7 +5,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-const PARTICLE_CHARS: [char; 5] = ['✦', '✧', '•', '*', '·'];
+const PARTICLE_CHARS: [char; 6] = ['█', '▓', '▒', '░', '•', '·'];
 
 pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     let w = area.width as usize;
@@ -18,28 +18,41 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     let num_bars = bars.len().max(1);
     let mut grid = vec![(' ', app.theme.color_subtext()); w * h];
 
-    let num_columns = w;
-    for col in 0..num_columns {
-        let bar_idx = (col * num_bars) / num_columns;
+    for col in 0..w {
+        let bar_idx = (col * num_bars) / w;
         let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
         let target_h = (val * h as f32).round() as usize;
 
         if target_h > 0 {
             for y in 0..target_h.min(h) {
                 let row = h - 1 - y;
-                let char_idx = (y % PARTICLE_CHARS.len()).min(PARTICLE_CHARS.len() - 1);
-                let symbol = if y == target_h.saturating_sub(1) {
-                    '✦'
-                } else {
-                    PARTICLE_CHARS[char_idx]
-                };
 
-                let color = if y > (h * 2) / 3 {
-                    app.theme.color_accent()
-                } else if y > h / 3 {
-                    app.theme.color_accent2()
+                let (symbol, color) = if y == target_h.saturating_sub(1) {
+                    if val > 0.7 {
+                        ('★', app.theme.color_text())
+                    } else if val > 0.4 {
+                        ('✦', app.theme.color_accent3())
+                    } else {
+                        ('✧', app.theme.color_accent())
+                    }
                 } else {
-                    app.theme.color_subtext()
+                    let level_ratio = y as f32 / h.max(1) as f32;
+                    let char_idx = ((1.0 - level_ratio) * (PARTICLE_CHARS.len() - 1) as f32)
+                        .round()
+                        .clamp(0.0, (PARTICLE_CHARS.len() - 1) as f32)
+                        as usize;
+                    let sym = PARTICLE_CHARS[char_idx];
+
+                    let col_color = if level_ratio > 0.70 {
+                        app.theme.color_accent3()
+                    } else if level_ratio > 0.40 {
+                        app.theme.color_accent()
+                    } else if level_ratio > 0.15 {
+                        app.theme.color_accent2()
+                    } else {
+                        app.theme.color_subtext()
+                    };
+                    (sym, col_color)
                 };
 
                 let idx = row * w + col;
