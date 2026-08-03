@@ -5,7 +5,8 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-const PARTICLE_CHARS: [char; 6] = ['█', '▓', '▒', '░', '•', '·'];
+const SPARKLE_STARS: [char; 6] = ['★', '✶', '✦', '✧', '✺', '·'];
+const WAVE_BASE: [char; 8] = ['⣀', '⣤', '⣴', '⣶', '⣾', '⣿', '⡿', '⠿'];
 
 pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     let w = area.width as usize;
@@ -21,43 +22,51 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     for col in 0..w {
         let bar_idx = (col * num_bars) / w;
         let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-        let target_h = (val * h as f32).round() as usize;
+        let column_h = (val * h as f32).round() as usize;
 
-        if target_h > 0 {
-            for y in 0..target_h.min(h) {
+        if column_h > 0 {
+            let base_h = (column_h / 2).max(1);
+            let particle_h = column_h;
+
+            // 1. Fluid liquid wave foundation at the bottom
+            for y in 0..base_h.min(h) {
                 let row = h - 1 - y;
+                let char_idx = (y * (WAVE_BASE.len() - 1)) / base_h.max(1);
+                let sym = WAVE_BASE[char_idx.min(WAVE_BASE.len() - 1)];
 
-                let (symbol, color) = if y == target_h.saturating_sub(1) {
-                    if val > 0.7 {
-                        ('★', app.theme.color_text())
-                    } else if val > 0.4 {
-                        ('✦', app.theme.color_accent3())
-                    } else {
-                        ('✧', app.theme.color_accent())
-                    }
+                let color = if y > base_h / 2 {
+                    app.theme.color_accent()
                 } else {
-                    let level_ratio = y as f32 / h.max(1) as f32;
-                    let char_idx = ((1.0 - level_ratio) * (PARTICLE_CHARS.len() - 1) as f32)
-                        .round()
-                        .clamp(0.0, (PARTICLE_CHARS.len() - 1) as f32)
-                        as usize;
-                    let sym = PARTICLE_CHARS[char_idx];
-
-                    let col_color = if level_ratio > 0.70 {
-                        app.theme.color_accent3()
-                    } else if level_ratio > 0.40 {
-                        app.theme.color_accent()
-                    } else if level_ratio > 0.15 {
-                        app.theme.color_accent2()
-                    } else {
-                        app.theme.color_subtext()
-                    };
-                    (sym, col_color)
+                    app.theme.color_accent2()
                 };
 
                 let idx = row * w + col;
                 if idx < grid.len() {
-                    grid[idx] = (symbol, color);
+                    grid[idx] = (sym, color);
+                }
+            }
+
+            // 2. Sparkling particle stars floating into the air above foundation
+            for y in base_h..particle_h.min(h) {
+                let row = h - 1 - y;
+                let star_idx = (col + y * 3) % SPARKLE_STARS.len();
+                let sym = SPARKLE_STARS[star_idx];
+
+                let color = if y == particle_h.saturating_sub(1) {
+                    if val > 0.6 {
+                        app.theme.color_text()
+                    } else {
+                        app.theme.color_accent3()
+                    }
+                } else if y > (particle_h + base_h) / 2 {
+                    app.theme.color_accent3()
+                } else {
+                    app.theme.color_accent()
+                };
+
+                let idx = row * w + col;
+                if idx < grid.len() {
+                    grid[idx] = (sym, color);
                 }
             }
         }

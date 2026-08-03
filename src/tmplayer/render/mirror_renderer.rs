@@ -21,48 +21,66 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
 
     let mut grid = vec![(' ', app.theme.color_subtext()); w * h];
 
+    // 1. Draw glowing laser horizon line across the exact center
+    for col in 0..w {
+        let idx = mid_row * w + col;
+        if idx < grid.len() {
+            grid[idx] = ('━', app.theme.color_text());
+        }
+    }
+
+    // 2. Draw symmetric mirrored frequency bars expanding upwards & downwards
     for col in 0..w {
         let bar_idx = (col * num_bars) / w;
         let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
         let bar_h = (val * max_half_h as f32).round() as usize;
 
-        for dy in 0..bar_h {
-            let ratio = dy as f32 / max_half_h as f32;
-            let char_idx = (ratio * (BLOCK_LEVELS.len() - 1) as f32)
-                .round()
-                .clamp(0.0, (BLOCK_LEVELS.len() - 1) as f32) as usize;
+        if bar_h > 0 {
+            for dy in 1..=bar_h {
+                let ratio = dy as f32 / max_half_h as f32;
+                let char_idx = (ratio * (BLOCK_LEVELS.len() - 1) as f32)
+                    .round()
+                    .clamp(0.0, (BLOCK_LEVELS.len() - 1) as f32) as usize;
 
-            let (sym_up, sym_down) = if dy == bar_h.saturating_sub(1) {
-                ('▲', '▼')
-            } else {
-                (BLOCK_LEVELS[char_idx], BLOCK_LEVELS[char_idx])
-            };
+                let is_peak = dy == bar_h;
+                let (sym_up, sym_down) = if is_peak {
+                    ('▔', ' ')
+                } else {
+                    (BLOCK_LEVELS[char_idx], BLOCK_LEVELS[char_idx])
+                };
 
-            let color = if dy == bar_h.saturating_sub(1) {
-                app.theme.color_text()
-            } else if dy > max_half_h / 2 {
-                app.theme.color_accent3()
-            } else if dy > max_half_h / 4 {
-                app.theme.color_accent()
-            } else {
-                app.theme.color_accent2()
-            };
+                let color_up = if is_peak {
+                    app.theme.color_text()
+                } else if dy > max_half_h / 2 {
+                    app.theme.color_accent3()
+                } else {
+                    app.theme.color_accent()
+                };
 
-            // Upward bar
-            if mid_row >= dy {
-                let up_row = mid_row - dy;
-                let idx = up_row * w + col;
-                if idx < grid.len() {
-                    grid[idx] = (sym_up, color);
+                let color_down = if is_peak {
+                    app.theme.color_text()
+                } else if dy > max_half_h / 2 {
+                    app.theme.color_accent2()
+                } else {
+                    app.theme.color_subtext()
+                };
+
+                // Upward bar (Warm Fire palette)
+                if mid_row >= dy {
+                    let up_row = mid_row - dy;
+                    let idx = up_row * w + col;
+                    if idx < grid.len() {
+                        grid[idx] = (sym_up, color_up);
+                    }
                 }
-            }
 
-            // Downward mirrored bar
-            let down_row = mid_row + dy;
-            if down_row < h {
-                let idx = down_row * w + col;
-                if idx < grid.len() {
-                    grid[idx] = (sym_down, color);
+                // Downward mirrored bar (Cool Ice palette)
+                let down_row = mid_row + dy;
+                if down_row < h {
+                    let idx = down_row * w + col;
+                    if idx < grid.len() {
+                        grid[idx] = (sym_down, color_down);
+                    }
                 }
             }
         }
