@@ -46,12 +46,10 @@ pub fn hit_test(area: Rect, app: &AppState, col: u16, row: u16) -> Option<Action
     };
     let repeat_symbol = app.player.repeat_mode.symbol();
 
-    // Must match render() exactly (including spaces) because we align by glyph width.
-    let s_prev = "[]";
-    let s_play = play;
-    let s_next = "[]";
-    let sep = " ";
-    let label = format!("{s_prev}{sep}{s_play}{sep}{s_next}{sep}{repeat_symbol}");
+    let s_prev = "[] ";
+    let s_play = format!("{} ", play);
+    let s_next = "[] ";
+    let label = format!("{s_prev}{s_play}{s_next}{repeat_symbol}");
 
     let text_w = UnicodeWidthStr::width(label.as_str()) as u16;
     if text_w == 0 || area.width == 0 {
@@ -69,24 +67,21 @@ pub fn hit_test(area: Rect, app: &AppState, col: u16, row: u16) -> Option<Action
         return Some(Action::Prev);
     }
     x += w_prev;
-    x += 1; // sep
 
-    let w_play = UnicodeWidthStr::width(s_play) as u16;
+    let w_play = UnicodeWidthStr::width(s_play.as_str()) as u16;
     if col >= x && col < x + w_play {
         return Some(Action::TogglePlayPause);
     }
     x += w_play;
-    x += 1; // sep
 
     let w_next = UnicodeWidthStr::width(s_next) as u16;
     if col >= x && col < x + w_next {
         return Some(Action::Next);
     }
     x += w_next;
-    x += 1; // sep
 
     let w_mode = UnicodeWidthStr::width(repeat_symbol) as u16;
-    if col >= x && col < x + w_mode {
+    if col >= x && col < x + w_mode + 2 {
         return Some(Action::ToggleRepeatMode);
     }
 

@@ -265,11 +265,11 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         height: 1,
     });
 
-    let mode_x = next_x.saturating_add(next_w).saturating_add(1);
+    let mode_x = next_x.saturating_add(next_w).saturating_add(2);
     hits.repeat_mode = Some(HitRect {
-        x: mode_x,
+        x: mode_x.saturating_sub(1),
         y: top.y,
-        width: mode_w.saturating_add(2),
+        width: mode_w.saturating_add(3),
         height: 1,
     });
 
