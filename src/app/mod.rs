@@ -1481,6 +1481,8 @@ pub struct PlayerBarHitTargets {
     pub prev: Option<HitRect>,
     pub play_pause: Option<HitRect>,
     pub next: Option<HitRect>,
+    pub repeat_mode: Option<HitRect>,
+    pub heart: Option<HitRect>,
     pub progress: Option<HitRect>,
 }
 
@@ -1958,6 +1960,18 @@ impl App {
                         return;
                     }
                 }
+                if let Some(rect) = self.player_bar_hits.repeat_mode {
+                    if rect.contains(col, row) {
+                        self.cycle_repeat_mode_hotkey();
+                        return;
+                    }
+                }
+                if let Some(rect) = self.player_bar_hits.heart {
+                    if rect.contains(col, row) {
+                        self.toggle_like_hotkey().await;
+                        return;
+                    }
+                }
                 if let Some(rect) = self.player_bar_hits.progress {
                     if rect.contains(col, row) {
                         let relative_x = col.saturating_sub(rect.x) as f32;
@@ -1987,6 +2001,16 @@ impl App {
             || self
                 .player_bar_hits
                 .next
+                .map(|rect| rect.contains(col, row))
+                .unwrap_or(false)
+            || self
+                .player_bar_hits
+                .repeat_mode
+                .map(|rect| rect.contains(col, row))
+                .unwrap_or(false)
+            || self
+                .player_bar_hits
+                .heart
                 .map(|rect| rect.contains(col, row))
                 .unwrap_or(false)
             || self

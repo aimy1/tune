@@ -238,29 +238,52 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut hits = PlayerBarHitTargets::default();
 
-    let controls_start = controls_rect.x + controls_rect.width.saturating_sub(controls_w) / 2;
+    let line_w = 1 + prev_w + 1 + play_w + 1 + next_w + 2 + mode_w;
+    let line_start_x = controls_rect.x + controls_rect.width.saturating_sub(line_w) / 2;
 
-    let mut x = controls_start;
+    let prev_x = line_start_x.saturating_add(1);
     hits.prev = Some(HitRect {
-        x,
+        x: prev_x,
         y: top.y,
         width: prev_w,
         height: 1,
     });
-    x = x.saturating_add(prev_w).saturating_add(1);
+
+    let play_x = prev_x.saturating_add(prev_w).saturating_add(1);
     hits.play_pause = Some(HitRect {
-        x,
+        x: play_x,
         y: top.y,
         width: play_w,
         height: 1,
     });
-    x = x.saturating_add(play_w).saturating_add(1);
+
+    let next_x = play_x.saturating_add(play_w).saturating_add(1);
     hits.next = Some(HitRect {
-        x,
+        x: next_x,
         y: top.y,
         width: next_w,
         height: 1,
     });
+
+    let mode_x = next_x.saturating_add(next_w).saturating_add(2);
+    hits.repeat_mode = Some(HitRect {
+        x: mode_x,
+        y: top.y,
+        width: mode_w,
+        height: 1,
+    });
+
+    if app.now_playing.is_some() {
+        let heart = if app.now_playing_liked { "" } else { "" };
+        let heart_w = display_width(heart) as u16;
+        let heart_x = left_rect.x + left_rect.width.saturating_sub(heart_w);
+        hits.heart = Some(HitRect {
+            x: heart_x,
+            y: top.y,
+            width: heart_w,
+            height: 1,
+        });
+    }
 
     if progress_w > 0 {
         let ratio = progress_ratio(position, duration);
