@@ -18,7 +18,7 @@ pub mod search_box;
 pub mod settings;
 pub mod theme;
 
-pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
+pub fn draw_header_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     if area.width < 10 || area.height == 0 {
         return;
     }
@@ -68,11 +68,11 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
 
     let user_name = if app.home_sidebar.user_name.trim().is_empty() {
         match app.config.language {
-            crate::data::config::Language::Zh => "游客模式",
-            crate::data::config::Language::En => "Guest Mode",
+            crate::data::config::Language::Zh => "游客模式".to_string(),
+            crate::data::config::Language::En => "Guest Mode".to_string(),
         }
     } else {
-        &app.home_sidebar.user_name
+        app.home_sidebar.user_name.clone()
     };
 
     let user_style = with_bar_bg(
@@ -158,6 +158,7 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         );
     }
 
+    app.set_user_profile_hit(header_cols[2]);
     frame.render_widget(
         Paragraph::new(Line::from(right_spans)).alignment(Alignment::Right),
         header_cols[2],

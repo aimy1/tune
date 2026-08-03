@@ -121,6 +121,10 @@ pub fn parse_home_sidebar_playlists(response: &ApiResponse) -> Vec<HomeSidebarPl
             })
             .unwrap_or(0);
 
+        let cover_url = parse_value_as_string(item.get("coverImgUrl"))
+            .or_else(|| parse_value_as_string(item.get("picUrl")))
+            .or_else(|| parse_value_as_string(item.get("coverUrl")));
+
         out.push(HomeSidebarPlaylist {
             id: parse_value_as_string(item.get("id")),
             title: title.to_string(),
@@ -130,6 +134,7 @@ pub fn parse_home_sidebar_playlists(response: &ApiResponse) -> Vec<HomeSidebarPl
                 .unwrap_or("Unknown User")
                 .to_string(),
             track_count,
+            cover_url,
         });
     }
 

@@ -563,6 +563,7 @@ pub struct HomeSidebarPlaylist {
     pub title: String,
     pub creator: String,
     pub track_count: usize,
+    pub cover_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1126,12 +1127,13 @@ impl PlaylistState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthorTileKind {
     HotSong,
     Album,
     Ep,
     Single,
+    Playlist(Option<String>),
 }
 
 pub struct AuthorTile {
@@ -1148,6 +1150,25 @@ impl AuthorTile {
             title: "暂无内容".to_string(),
             subtitle: "No content".to_string(),
             cover: CoverFetchState::default(),
+        }
+    }
+
+    pub fn from_playlist(
+        api: &ApiState,
+        id: Option<String>,
+        title: String,
+        subtitle: String,
+        cover_url: Option<String>,
+    ) -> Self {
+        let mut cover = CoverFetchState::default();
+        if let Some(url) = cover_url {
+            cover.load(api.clone(), url);
+        }
+        Self {
+            kind: AuthorTileKind::Playlist(id),
+            title,
+            subtitle,
+            cover,
         }
     }
 
@@ -1599,6 +1620,7 @@ pub struct App {
     pub playback_state: PlaybackRuntimeState,
     pub startup_loading_progress: f32,
     pub player_bar_hits: PlayerBarHitTargets,
+    pub user_profile_hit: Option<HitRect>,
     pub home_sidebar_panel_hit: Option<HitRect>,
     pub home_sidebar_playlist_hits: Vec<(HitRect, HomeSidebarHit)>,
     pub home_tile_hits: Vec<(HitRect, usize)>,
@@ -1709,6 +1731,7 @@ impl App {
             playback_state: PlaybackRuntimeState::Stopped,
             startup_loading_progress: 0.0,
             player_bar_hits: PlayerBarHitTargets::default(),
+            user_profile_hit: None,
             home_sidebar_panel_hit: None,
             home_sidebar_playlist_hits: Vec::new(),
             home_tile_hits: Vec::new(),
@@ -2082,12 +2105,22 @@ impl App {
     }
 
     pub fn clear_content_hits(&mut self) {
+        self.user_profile_hit = None;
         self.home_sidebar_panel_hit = None;
         self.home_sidebar_playlist_hits.clear();
         self.home_tile_hits.clear();
         self.playlist_track_hits.clear();
         self.author_tile_hits.clear();
         self.search_item_hits.clear();
+    }
+
+    pub fn set_user_profile_hit(&mut self, rect: Rect) {
+        self.user_profile_hit = Some(HitRect {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        });
     }
 
     pub fn set_home_sidebar_panel_hit(&mut self, rect: Option<HitRect>) {
@@ -3489,6 +3522,27 @@ impl App {
             return;
         };
 
+        if let AuthorTileKind::Playlist(ref opt_id) = item.kind {
+            if let Some(playlist_id) = opt_id.clone() {
+                let title = item.title.clone();
+                self.set_runtime_status(format!("{} {}", self.lang_text("正在加载歌单", "Loading playlist"), title));
+                match self.load_playlist_detail(&playlist_id).await {
+                    Ok(()) => {
+                        self.playlist_return_page = Page::Author;
+                        self.playlist_section_return_snapshot = None;
+                        self.page = Page::Playlist;
+                        self.set_runtime_status(format!("{} {}", self.lang_text("已打开歌单", "Opened playlist"), title));
+                    }
+                    Err(err) => {
+                        self.set_runtime_status(format!("{}: {}", self.lang_text("打开歌单失败", "Failed to open playlist"), err));
+                    }
+                }
+            } else {
+                self.set_runtime_status(self.lang_text("无法打开未知歌单", "Cannot open unknown playlist"));
+            }
+            return;
+        }
+
         let (section_title, tracks, section_cover) = match item.kind {
             AuthorTileKind::HotSong => (
                 self.lang_text("热门歌曲", "Hot Songs").to_string(),
@@ -3526,6 +3580,7 @@ impl App {
                     .and_then(|track| track.cover_url.clone())
                     .or_else(|| self.author.cover.url.clone()),
             ),
+            AuthorTileKind::Playlist(_) => (String::new(), Vec::new(), None),
         };
 
         if tracks.is_empty() {
@@ -4347,10 +4402,99 @@ impl App {
             }
             KeyCode::Enter => self.play_focused_author_tile().await,
             KeyCode::Esc => {
-                self.page = Page::Search;
+                self.page = self.playlist_return_page;
             }
             _ => {}
         }
+    }
+
+    pub async fn open_personal_center_page(&mut self) {
+        if self.home_sidebar.created_playlists.is_empty() && self.home_sidebar.collected_playlists.is_empty() {
+            let _ = self.load_home_sidebar_playlists().await;
+        }
+
+        let user_name = if self.home_sidebar.user_name.trim().is_empty() {
+            self.lang_text("我的歌单", "My Playlists").to_string()
+        } else {
+            self.home_sidebar.user_name.clone()
+        };
+
+        let created_count = self.home_sidebar.created_playlists.len();
+        let collected_count = self.home_sidebar.collected_playlists.len();
+
+        let mut tiles = Vec::new();
+
+        for item in &self.home_sidebar.created_playlists {
+            let tag = match self.config.language {
+                Language::Zh => format!("创建歌单 · {} 首", item.track_count),
+                Language::En => format!("Created · {} tracks", item.track_count),
+            };
+            tiles.push(AuthorTile::from_playlist(
+                &self.api,
+                item.id.clone(),
+                item.title.clone(),
+                tag,
+                item.cover_url.clone(),
+            ));
+        }
+
+        for item in &self.home_sidebar.collected_playlists {
+            let tag = match self.config.language {
+                Language::Zh => format!("收藏 ({}) · {} 首", item.creator, item.track_count),
+                Language::En => format!("Collected ({}) · {} tracks", item.creator, item.track_count),
+            };
+            tiles.push(AuthorTile::from_playlist(
+                &self.api,
+                item.id.clone(),
+                item.title.clone(),
+                tag,
+                item.cover_url.clone(),
+            ));
+        }
+
+        if tiles.is_empty() {
+            tiles.push(AuthorTile::placeholder());
+        }
+
+        let header_title = match self.config.language {
+            Language::Zh => format!("{} 的个人主页", user_name),
+            Language::En => format!("{}'s Profile", user_name),
+        };
+
+        let header_subtitle = match self.config.language {
+            Language::Zh => format!("创建 {} 个歌单  |  收藏 {} 个歌单", created_count, collected_count),
+            Language::En => format!("{} created  |  {} collected", created_count, collected_count),
+        };
+
+        let header_desc = match self.config.language {
+            Language::Zh => "点击或 Enter 进入歌单详情",
+            Language::En => "Click or press Enter to view playlist",
+        }.to_string();
+
+        let mut cover = CoverFetchState::default();
+        if let Some(first_url) = tiles.first().and_then(|t| t.cover.url.clone()) {
+            cover.load(self.api.clone(), first_url);
+        }
+
+        self.author = AuthorState {
+            id: self.home_sidebar.user_id.clone(),
+            title: header_title,
+            artist: header_subtitle,
+            description: header_desc,
+            cover,
+            focused_idx: 0,
+            columns: 1,
+            scroll_row_offset: 0,
+            visible_rows: 1,
+            tiles,
+            hot_songs: Vec::new(),
+            albums: Vec::new(),
+            eps: Vec::new(),
+            singles: Vec::new(),
+        };
+
+        self.playlist_return_page = self.page;
+        self.page = Page::Author;
     }
 
     fn tick_search_box_animation(&mut self) {
@@ -4459,6 +4603,13 @@ impl App {
     }
 
     async fn handle_content_click(&mut self, col: u16, row: u16) -> bool {
+        if let Some(hit) = self.user_profile_hit {
+            if hit.contains(col, row) {
+                self.open_personal_center_page().await;
+                return true;
+            }
+        }
+
         match self.page {
             Page::Home => {
                 if self.home_sidebar.is_visible() {
@@ -5904,7 +6055,7 @@ impl App {
                                 AuthorTileKind::HotSong => PlaylistTrackKind::Song,
                                 AuthorTileKind::Album => PlaylistTrackKind::Album,
                                 AuthorTileKind::Ep => PlaylistTrackKind::Ep,
-                                AuthorTileKind::Single => PlaylistTrackKind::Single,
+                                _ => PlaylistTrackKind::Single,
                             },
                             id: parse_value_as_string(item.get("id")),
                             title: name.to_string(),
@@ -5919,7 +6070,7 @@ impl App {
                         match kind {
                             AuthorTileKind::HotSong | AuthorTileKind::Album => albums.push(track),
                             AuthorTileKind::Ep => eps.push(track),
-                            AuthorTileKind::Single => singles.push(track),
+                            _ => singles.push(track),
                         }
                     }
                 }
