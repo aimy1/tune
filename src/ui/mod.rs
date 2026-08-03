@@ -54,33 +54,17 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         .fg(app.theme.color_base())
         .bg(app.theme.color_accent())
         .add_modifier(Modifier::BOLD);
-    let separator_style = with_bar_bg(Style::default().fg(app.theme.color_buff()));
-    let tagline_style = with_bar_bg(Style::default().fg(app.theme.color_subtext()));
 
     let logo_text = match app.config.language {
         crate::data::config::Language::Zh => " 󰎆 网易云 ",
         crate::data::config::Language::En => " 󰎆 NetEase ",
     };
-    let tagline_text = match app.config.language {
-        crate::data::config::Language::Zh => "传递音乐的力量",
-        crate::data::config::Language::En => "Convey the power of music",
-    };
 
     let show_full_header = inner.width >= 80;
 
-    let left_spans = if show_full_header {
-        vec![
-            Span::styled(logo_text, logo_style),
-            Span::styled("  ", with_bar_bg(Style::default())),
-            Span::styled("│", separator_style),
-            Span::styled("  ", with_bar_bg(Style::default())),
-            Span::styled(tagline_text, tagline_style),
-        ]
-    } else {
-        vec![
-            Span::styled(logo_text, logo_style),
-        ]
-    };
+    let left_spans = vec![
+        Span::styled(logo_text, logo_style),
+    ];
 
     let user_name = if app.home_sidebar.user_name.trim().is_empty() {
         match app.config.language {
@@ -108,7 +92,7 @@ pub fn draw_header_bar(frame: &mut Frame, app: &App, area: Rect) {
         .direction(Direction::Horizontal)
         .constraints(if show_full_header {
             [
-                Constraint::Length(30),
+                Constraint::Length(15),
                 Constraint::Min(20),
                 Constraint::Length(15),
             ]
