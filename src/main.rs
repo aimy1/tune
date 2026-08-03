@@ -279,6 +279,18 @@ async fn launch_tmplayer_fullscreen(
             bridge.app.open_settings_from_fullscreen();
             String::new()
         }
+        Ok(tmplayer::FullscreenExit::BackToHostOpenSearch) => {
+            bridge.app.open_search_box();
+            String::new()
+        }
+        Ok(tmplayer::FullscreenExit::BackToHostOpenPersonalCenter) => {
+            bridge.app.open_personal_center_page().await;
+            String::new()
+        }
+        Ok(tmplayer::FullscreenExit::QuitApp) => {
+            bridge.app.should_quit = true;
+            String::new()
+        }
         Err(err) => format!("TMPlayer 运行失败: {}", err),
     };
 

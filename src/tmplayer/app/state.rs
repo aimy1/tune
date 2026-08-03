@@ -313,8 +313,9 @@ pub struct AppState {
 
     pub toast: Option<(String, Instant)>,
 
-    // Ask host Tune to open its settings after exiting fullscreen.
+    // Ask host Tune to exit or open specific pages after exiting fullscreen.
     pub request_host_settings_open: bool,
+    pub request_host_exit: Option<crate::tmplayer::FullscreenExit>,
 
     pub last_mouse_click: Option<(Instant, u16, u16)>,
 
@@ -425,6 +426,7 @@ impl AppState {
             pending_system_cover_anim: None,
             toast: None,
             request_host_settings_open: false,
+            request_host_exit: None,
             last_mouse_click: None,
             playlist_slide_x: 0,
             playlist_slide_target_x: 0,

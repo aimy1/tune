@@ -829,7 +829,7 @@ pub async fn run(
             std::thread::sleep(frame_dt - elapsed);
         }
 
-        if tui.should_quit {
+        if app.request_host_exit.is_some() || tui.should_quit {
             break;
         }
     }
@@ -837,7 +837,9 @@ pub async fn run(
     tui.exit()?;
     disable_raw_mode()?;
 
-    let exit = if app.request_host_settings_open {
+    let exit = if let Some(exit) = app.request_host_exit {
+        exit
+    } else if app.request_host_settings_open {
         crate::tmplayer::FullscreenExit::BackToHostOpenSettings
     } else {
         crate::tmplayer::FullscreenExit::BackToHost
@@ -952,19 +954,28 @@ async fn handle_action(
 ) -> Result<()> {
     match action {
         Action::Quit => {
-            if app.player.mode == PlayMode::LocalPlayback && app.config.resume_last_position {
-                if let (Some(folder), Some(cur_path)) = (
-                    app.local_folder.as_deref(),
-                    app.playlist.current_path().cloned(),
-                ) {
-                    let pos = mode_manager.local.position().unwrap_or(app.player.position);
-                    let _ = crate::tmplayer::playback::local_player::write_last_position(
-                        folder, &cur_path, pos,
-                    );
-                }
+            app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHost);
+        }
+        Action::OpenSearch => {
+            app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHostOpenSearch);
+        }
+        Action::OpenPersonalCenter => {
+            app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHostOpenPersonalCenter);
+        }
+        Action::SeekDelta(delta) => {
+            let pos = app.player.position;
+            let dur = app.player.track.duration;
+            let target_secs = (pos.as_secs_f32() + delta).clamp(0.0, dur.as_secs_f32());
+            let ratio = if dur.as_secs_f32() > 0.0 {
+                target_secs / dur.as_secs_f32()
+            } else {
+                0.0
+            };
+            if let Some(bridge) = host_bridge.as_mut() {
+                (*bridge).seek_to_ratio(ratio);
+                let snapshot = (*bridge).snapshot();
+                sync_from_host_snapshot(app, snapshot);
             }
-            // handled by tui flag
-            app.set_toast("Bye");
         }
         Action::OpenSettingsModal => {
             app.settings_selected = app.settings_selected.min(9);

@@ -4723,7 +4723,7 @@ impl App {
         false
     }
 
-    fn open_search_box(&mut self) {
+    pub fn open_search_box(&mut self) {
         if self.page != Page::Search {
             self.search_return_page = Page::Home;
         }

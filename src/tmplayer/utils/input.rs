@@ -42,6 +42,10 @@ pub enum Action {
     NextAlbum,
 
     SeekToFraction(f32),
+    SeekDelta(f32),
+
+    OpenSearch,
+    OpenPersonalCenter,
 
     FolderChar(char),
     FolderBackspace,
@@ -224,6 +228,18 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         };
     }
 
+    if keybind_matches(&config.keybind_personal_center, ev) {
+        return Action::OpenPersonalCenter;
+    }
+
+    if keybind_matches(&config.keybind_search_box, ev) {
+        return Action::OpenSearch;
+    }
+
+    if keybind_matches(&config.keybind_quit, ev) {
+        return Action::Quit;
+    }
+
     if keybind_matches(&config.keybind_sidebar, ev) {
         return Action::TogglePlaylist;
     }
@@ -248,7 +264,19 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return Action::TogglePlayPause;
     }
 
+    if ev.modifiers.contains(KeyModifiers::SHIFT) || ev.modifiers.contains(KeyModifiers::CONTROL) {
+        if matches!(ev.code, KeyCode::Left) {
+            return Action::SeekDelta(-5.0);
+        }
+        if matches!(ev.code, KeyCode::Right) {
+            return Action::SeekDelta(5.0);
+        }
+    }
+
     match ev.code {
+        KeyCode::Char('z') | KeyCode::Char('Z') => Action::OpenPersonalCenter,
+        KeyCode::Char('s') | KeyCode::Char('S') => Action::OpenSearch,
+        KeyCode::Char('q') | KeyCode::Char('Q') => Action::Quit,
         KeyCode::Char('m') | KeyCode::Char('M') => Action::ToggleRepeatMode,
         KeyCode::Char('l') | KeyCode::Char('L') => Action::ToggleFavorite,
         KeyCode::Esc => Action::Quit,

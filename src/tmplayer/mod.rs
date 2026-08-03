@@ -52,6 +52,10 @@ pub struct FullscreenBootstrap {
 pub enum FullscreenExit {
     BackToHost,
     BackToHostOpenSettings,
+    BackToHostOpenSearch,
+    BackToHostOpenPersonalCenter,
+    #[allow(dead_code)]
+    QuitApp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

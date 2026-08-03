@@ -212,6 +212,7 @@ pub fn write_last_album(root: &Path, album_folder: &Path) -> Result<()> {
     write_order_file_struct(root, &of)
 }
 
+#[allow(dead_code)]
 pub fn write_last_position(folder: &Path, song_path: &Path, position: Duration) -> Result<()> {
     let mut of = read_order_file(folder).unwrap_or_default();
     of.last_position_song = Some(order_key(folder, song_path));
