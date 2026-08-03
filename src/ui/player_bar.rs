@@ -74,14 +74,9 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
             " ".repeat(10)
         };
 
-    let spectrum_w = display_width(&spectrum).min(10) as u16;
-
     let controls_col_w = controls_w.saturating_add(2).min(top.width);
-    let spectrum_col_w = spectrum_w.min(top.width.saturating_sub(controls_col_w));
-    let left_col_w = top
-        .width
-        .saturating_sub(controls_col_w)
-        .saturating_sub(spectrum_col_w);
+    let controls_x = top.x + top.width.saturating_sub(controls_col_w) / 2;
+    let left_col_w = controls_x.saturating_sub(top.x);
 
     let left_rect = Rect {
         x: top.x,
@@ -90,13 +85,15 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         height: 1,
     };
     let controls_rect = Rect {
-        x: left_rect.x + left_rect.width,
+        x: controls_x,
         y: top.y,
         width: controls_col_w,
         height: 1,
     };
+    let spectrum_x = controls_x + controls_col_w;
+    let spectrum_col_w = (top.x + top.width).saturating_sub(spectrum_x);
     let spectrum_rect = Rect {
-        x: controls_rect.x + controls_rect.width,
+        x: spectrum_x,
         y: top.y,
         width: spectrum_col_w,
         height: 1,
