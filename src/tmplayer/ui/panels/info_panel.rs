@@ -8,7 +8,7 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{Block, Borders, Paragraph};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -413,31 +413,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
 
         // (Removed S/R hint)
     }
-
-    // header right status (theme + mode)
-    let mode_key = match app.language {
-        crate::data::config::Language::Zh => "模式",
-        crate::data::config::Language::En => "Mode",
-    };
-    let header = format!(
-        "[{}]  [{}: {}]",
-        app.theme.name.as_label(),
-        mode_key,
-        mode_label(app.player.mode, app.language)
-    );
-    let header_area = Rect {
-        x: area.x + 2,
-        y: area.y,
-        width: area.width.saturating_sub(4),
-        height: 1,
-    };
-    f.render_widget(
-        Paragraph::new(header)
-            .style(Style::default().fg(app.theme.color_subtext()))
-            .alignment(Alignment::Right)
-            .wrap(Wrap { trim: true }),
-        header_area,
-    );
 }
 
 fn cover_box_ascii_for_snapshot(
@@ -705,6 +680,7 @@ fn compose_left_right_line(left: &str, right: &str, width: usize) -> String {
     format!("{left_text}{}{right}", " ".repeat(pad))
 }
 
+#[allow(dead_code)]
 fn mode_label(m: PlayMode, lang: crate::data::config::Language) -> &'static str {
     match (m, lang) {
         (PlayMode::Idle, crate::data::config::Language::Zh) => "网络",

@@ -260,23 +260,7 @@ impl Tui {
                 );
             }
 
-            if app.config.show_hints {
-                let hint_text = lang_text(app, "Ctrl+K 打开按键绑定", "Ctrl+K open keybinds");
-                let hint_area = Rect {
-                    x: size.x,
-                    y: size.y + size.height.saturating_sub(1),
-                    width: size.width,
-                    height: 1,
-                };
-                let mut hint_style = Style::default().fg(app.theme.color_subtext());
-                if !app.config.transparent_background {
-                    hint_style = hint_style.bg(app.theme.color_base());
-                }
-                f.render_widget(
-                    Paragraph::new(format!(" {}", hint_text)).style(hint_style),
-                    hint_area,
-                );
-            }
+
 
             // Paint kitty images on top of ratatui widgets.
             Self::paint_kitty_images(&mut self.graphics_overlay, f, app, &layout_out);

@@ -570,8 +570,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
             Style::default()
                 .fg(app.theme.color_subtext())
                 .bg(app.theme.color_surface()),
-        )
-        .title(format!("Playlist ({} tracks)", app.playlist_view.len()));
+        );
     f.render_widget(block, area);
 
     let l = compute_layout(area, app);
