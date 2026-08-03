@@ -24,39 +24,48 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
 
     let bars = &app.spectrum.bars;
     let num_bars = bars.len().max(1);
-    let max_r = (cx.min(cy) * 0.90).max(2.0);
 
-    // Pulse inner core radius with bass
+    // Fill the available box height/width comfortably
+    let max_r = (cx.min(cy * 1.25) * 0.90).max(4.0);
+
+    // Pulse inner core radius with bass energy
     let bass_energy = bars.iter().take(4).sum::<f32>() / 4.0;
-    let base_r = (max_r * (0.28 + bass_energy.clamp(0.0, 1.0) * 0.12)).max(1.0);
+    let inner_r = (max_r * (0.35 + bass_energy.clamp(0.0, 1.0) * 0.10)).max(2.0);
 
     let mut cell_bits = vec![0u8; w_cells * h_cells];
-    let num_rays = 120.min(w_px * 2);
 
+    // 1. Draw inner pulsing disc border ring
+    let disc_steps = 64;
+    for i in 0..disc_steps {
+        let angle = (i as f32 / disc_steps as f32) * TAU;
+        let px = (cx + inner_r * angle.cos()).round() as i32;
+        let py = (cy + inner_r * angle.sin()).round() as i32;
+        set_pixel(&mut cell_bits, w_cells, w_px, h_px, px, py);
+    }
+
+    // 2. Draw 48 distinct, crisp radial equalizer bars
+    let num_rays = 48;
     for i in 0..num_rays {
         let angle = (i as f32 / num_rays as f32) * TAU - std::f32::consts::FRAC_PI_2;
         let bar_idx = (i * num_bars) / num_rays;
-        let amp = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-        let ray_len = base_r + amp * (max_r - base_r);
+        let val = bars.get(bar_idx).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        let ray_len = inner_r + val * (max_r - inner_r);
 
-        let steps = (ray_len as usize).max(1);
-        for s in 0..=steps {
-            let r = base_r + (s as f32 / steps as f32) * (ray_len - base_r);
+        // Ray line
+        let steps = (ray_len - inner_r).max(1.0) as usize;
+        for s in 1..=steps {
+            let r = inner_r + (s as f32 / steps as f32) * (ray_len - inner_r);
             let px = (cx + r * angle.cos()).round() as i32;
             let py = (cy + r * angle.sin()).round() as i32;
+            set_pixel(&mut cell_bits, w_cells, w_px, h_px, px, py);
+        }
 
-            if px >= 0 && px < w_px as i32 && py >= 0 && py < h_px as i32 {
-                let cell_x = (px as usize) / 2;
-                let cell_y = (py as usize) / 4;
-                let sub_x = (px as usize) % 2;
-                let sub_y = (py as usize) % 4;
-
-                let bit = braille_bit(sub_x, sub_y);
-                let idx = cell_y * w_cells + cell_x;
-                if idx < cell_bits.len() {
-                    cell_bits[idx] |= bit;
-                }
-            }
+        // Floating peak dot
+        if val > 0.05 {
+            let peak_r = (ray_len + 1.5).min(max_r + 2.0);
+            let px = (cx + peak_r * angle.cos()).round() as i32;
+            let py = (cy + peak_r * angle.sin()).round() as i32;
+            set_pixel(&mut cell_bits, w_cells, w_px, h_px, px, py);
         }
     }
 
@@ -81,12 +90,12 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
                 char::from_u32(0x2800 + bits as u32).unwrap_or(' ')
             };
 
-            let fg = if norm_dist < 0.30 {
-                mix(app.theme.color_text(), app.theme.color_accent(), norm_dist / 0.30)
-            } else if norm_dist < 0.65 {
-                mix(app.theme.color_accent(), app.theme.color_accent2(), (norm_dist - 0.30) / 0.35)
+            let fg = if norm_dist < 0.25 {
+                mix(app.theme.color_text(), app.theme.color_accent(), norm_dist / 0.25)
+            } else if norm_dist < 0.60 {
+                mix(app.theme.color_accent(), app.theme.color_accent2(), (norm_dist - 0.25) / 0.35)
             } else {
-                mix(app.theme.color_accent2(), app.theme.color_accent3(), (norm_dist - 0.65) / 0.35)
+                mix(app.theme.color_accent2(), app.theme.color_accent3(), (norm_dist - 0.60) / 0.40)
             };
 
             spans.push(Span::styled(ch.to_string(), Style::default().fg(fg)));
@@ -95,6 +104,21 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     }
 
     f.render_widget(Paragraph::new(lines), area);
+}
+
+fn set_pixel(cell_bits: &mut [u8], w_cells: usize, w_px: usize, h_px: usize, px: i32, py: i32) {
+    if px >= 0 && px < w_px as i32 && py >= 0 && py < h_px as i32 {
+        let cell_x = (px as usize) / 2;
+        let cell_y = (py as usize) / 4;
+        let sub_x = (px as usize) % 2;
+        let sub_y = (py as usize) % 4;
+
+        let bit = braille_bit(sub_x, sub_y);
+        let idx = cell_y * w_cells + cell_x;
+        if idx < cell_bits.len() {
+            cell_bits[idx] |= bit;
+        }
+    }
 }
 
 fn braille_bit(sub_x: usize, sub_y: usize) -> u8 {
