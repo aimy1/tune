@@ -6251,11 +6251,23 @@ fn pick_shuffle_index(len: usize, current: usize) -> usize {
         return 0;
     }
 
-    let now = SystemTime::now()
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let count = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+    let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_nanos() as usize;
-    let mut index = now % len;
+        .as_nanos() as u64;
+
+    let mut state = nanos.wrapping_add(count.wrapping_mul(0x9e3779b97f4a7c15));
+    state ^= state >> 30;
+    state = state.wrapping_mul(0xbf58476d1ce4e5b9);
+    state ^= state >> 27;
+    state = state.wrapping_mul(0x94d049bb133111eb);
+    state ^= state >> 31;
+
+    let mut index = (state as usize) % len;
     if index == current {
         index = (index + 1) % len;
     }
