@@ -56,7 +56,7 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
             let frac = (fill - full as f32).clamp(0.0, 1.0);
 
             for y in 0..=max_half_h {
-                let ch = if y < full {
+                let ch_up = if y < full {
                     '█'
                 } else if y == full {
                     smooth_char(frac)
@@ -64,14 +64,20 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
                     ' '
                 };
 
-                if ch != ' ' {
-                    for x in x_cursor..(x_cursor + bar_width).min(w) {
-                        if mid_row >= y {
-                            app.spectrum_render_grid[mid_row - y][x] = ch;
-                        }
-                        if mid_row + y < h {
-                            app.spectrum_render_grid[mid_row + y][x] = ch;
-                        }
+                let ch_down = if y < full {
+                    '█'
+                } else if y == full {
+                    downward_smooth_char(frac)
+                } else {
+                    ' '
+                };
+
+                for x in x_cursor..(x_cursor + bar_width).min(w) {
+                    if mid_row >= y && ch_up != ' ' {
+                        app.spectrum_render_grid[mid_row - y][x] = ch_up;
+                    }
+                    if mid_row + y < h && ch_down != ' ' {
+                        app.spectrum_render_grid[mid_row + y][x] = ch_down;
                     }
                 }
             }
@@ -93,6 +99,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
         x_cursor = x_cursor.saturating_add(bar_width);
         if i + 1 < draw_total {
             x_cursor = x_cursor.saturating_add(gap_width);
+        }
+    }
+
+    // Fill center line empty cells with horizontal divider line
+    for x in x_offset..x_cursor.min(w) {
+        if app.spectrum_render_grid[mid_row][x] == ' ' {
+            app.spectrum_render_grid[mid_row][x] = '─';
         }
     }
 
@@ -290,6 +303,18 @@ fn smooth_char(frac: f32) -> char {
         '▆'
     } else if frac < 6.0 / 7.0 {
         '▇'
+    } else {
+        '█'
+    }
+}
+
+fn downward_smooth_char(frac: f32) -> char {
+    if frac <= 0.0 {
+        ' '
+    } else if frac < 0.25 {
+        '▔'
+    } else if frac < 0.65 {
+        '▀'
     } else {
         '█'
     }
