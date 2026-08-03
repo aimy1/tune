@@ -57,9 +57,6 @@ pub fn hit_test(area: Rect, app: &AppState, col: u16, row: u16) -> Option<Action
     }
 
     let start_x = area.x + area.width.saturating_sub(text_w) / 2;
-    if col < start_x || col >= start_x + text_w {
-        return None;
-    }
     let mut x = start_x;
 
     let w_prev = UnicodeWidthStr::width(s_prev) as u16;
@@ -80,8 +77,7 @@ pub fn hit_test(area: Rect, app: &AppState, col: u16, row: u16) -> Option<Action
     }
     x += w_next;
 
-    let w_mode = UnicodeWidthStr::width(repeat_symbol) as u16;
-    if col >= x && col < x + w_mode + 2 {
+    if col >= x.saturating_sub(1) && col <= x + 4 {
         return Some(Action::ToggleRepeatMode);
     }
 
