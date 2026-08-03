@@ -114,6 +114,27 @@ fn centered_lyric_window(app: &AppState, visible_rows: usize) -> Vec<Line<'stati
     }
 
     let pos_ms = app.player.position.as_millis() as u64;
+
+    if pos_ms < lines[0].start_ms {
+        let intro = match app.language {
+            crate::data::config::Language::Zh => "♪ 纯音乐，请欣赏 ♪",
+            crate::data::config::Language::En => "♪ Music Intro ♪",
+        };
+        rows[current_row] = Line::from(Span::styled(
+            intro,
+            Style::default()
+                .fg(app.theme.color_accent2())
+                .add_modifier(Modifier::BOLD),
+        ));
+        if current_row + 1 < rows_count {
+            rows[current_row + 1] = Line::from(Span::styled(
+                lines[0].text.clone(),
+                Style::default().fg(app.theme.color_subtext()),
+            ));
+        }
+        return rows;
+    }
+
     let current_idx = current_lyric_index(lines, pos_ms);
 
     for row in 0..rows_count {
@@ -123,14 +144,29 @@ fn centered_lyric_window(app: &AppState, visible_rows: usize) -> Vec<Line<'stati
         }
 
         let lyric = &lines[lyric_idx as usize];
-        let style = if lyric_idx as usize == current_idx {
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .add_modifier(Modifier::BOLD)
+        let idx = lyric_idx as usize;
+
+        let line_span = if idx == current_idx {
+            let active_text = format!("▸ {}", lyric.text);
+            Span::styled(
+                active_text,
+                Style::default()
+                    .fg(app.theme.color_accent2())
+                    .add_modifier(Modifier::BOLD),
+            )
+        } else if idx < current_idx {
+            Span::styled(
+                lyric.text.clone(),
+                Style::default().fg(app.theme.color_subtext()),
+            )
         } else {
-            Style::default().fg(app.theme.color_subtext())
+            Span::styled(
+                lyric.text.clone(),
+                Style::default().fg(app.theme.color_text()),
+            )
         };
-        rows[row] = Line::from(Span::styled(lyric.text.clone(), style));
+
+        rows[row] = Line::from(line_span);
     }
 
     rows
@@ -143,19 +179,28 @@ fn no_lyrics_label(app: &AppState) -> &'static str {
     }
 }
 
-fn current_two_lines(app: &AppState) -> (&str, &str) {
+fn current_two_lines(app: &AppState) -> (String, String) {
     let Some(lines) = app.player.track.lyrics.as_ref() else {
-        return ("", "");
+        return (no_lyrics_label(app).to_string(), String::new());
     };
     if lines.is_empty() {
-        return ("", "");
+        return (no_lyrics_label(app).to_string(), String::new());
     }
 
     let pos_ms = app.player.position.as_millis() as u64;
+
+    if pos_ms < lines[0].start_ms {
+        let intro = match app.language {
+            crate::data::config::Language::Zh => "♪ 纯音乐，请欣赏 ♪",
+            crate::data::config::Language::En => "♪ Music Intro ♪",
+        };
+        return (intro.to_string(), lines[0].text.clone());
+    }
+
     let idx = current_lyric_index(lines, pos_ms);
 
-    let l1 = lines.get(idx).map(|l| l.text.as_str()).unwrap_or("");
-    let l2 = lines.get(idx + 1).map(|l| l.text.as_str()).unwrap_or("");
+    let l1 = lines.get(idx).map(|l| l.text.clone()).unwrap_or_default();
+    let l2 = lines.get(idx + 1).map(|l| l.text.clone()).unwrap_or_default();
     (l1, l2)
 }
 

@@ -5089,16 +5089,36 @@ impl App {
 
     pub fn current_page_lyric_lines(&self) -> (String, String) {
         let Some(track) = self.now_playing.as_ref() else {
-            return (String::new(), String::new());
+            let no_lyrics = match self.config.language {
+                Language::Zh => "暂无歌词",
+                Language::En => "No lyrics",
+            };
+            return (no_lyrics.to_string(), String::new());
         };
         let Some(lines) = track.lyrics.as_ref() else {
-            return (String::new(), String::new());
+            let no_lyrics = match self.config.language {
+                Language::Zh => "暂无歌词",
+                Language::En => "No lyrics",
+            };
+            return (no_lyrics.to_string(), String::new());
         };
         if lines.is_empty() {
-            return (String::new(), String::new());
+            let no_lyrics = match self.config.language {
+                Language::Zh => "暂无歌词",
+                Language::En => "No lyrics",
+            };
+            return (no_lyrics.to_string(), String::new());
         }
 
         let pos_ms = self.playback_position().as_millis() as u64;
+        if pos_ms < lines[0].start_ms {
+            let intro = match self.config.language {
+                Language::Zh => "♪ 纯音乐，请欣赏 ♪",
+                Language::En => "♪ Music Intro ♪",
+            };
+            return (intro.to_string(), lines[0].text.clone());
+        }
+
         let mut idx = 0usize;
         for (line_idx, line) in lines.iter().enumerate() {
             if line.start_ms <= pos_ms {

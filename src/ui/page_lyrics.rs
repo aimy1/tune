@@ -55,42 +55,55 @@ pub fn draw_page_lyrics_panel(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    let (current, next) = app.current_page_lyric_lines();
-    let (line1, line2) = if current.trim().is_empty() {
-        match app.config.language {
-            Language::Zh => ("暂无歌词".to_string(), String::new()),
-            Language::En => ("No lyrics".to_string(), String::new()),
-        }
+    let (line1, line2) = app.current_page_lyric_lines();
+
+    if line2.trim().is_empty() {
+        let y_off = if inner.height >= 2 { (inner.height - 1) / 2 } else { 0 };
+        let r = Rect {
+            x: inner.x,
+            y: inner.y + y_off,
+            width: inner.width,
+            height: 1,
+        };
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                line1,
+                Style::default()
+                    .fg(app.theme.color_accent2())
+                    .add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true }),
+            r,
+        );
     } else {
-        (current, next)
-    };
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(inner);
 
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1)])
-        .split(inner);
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                line1,
+                Style::default()
+                    .fg(app.theme.color_accent2())
+                    .add_modifier(Modifier::BOLD),
+            )))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true }),
+            rows[0],
+        );
 
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            line1,
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .add_modifier(Modifier::BOLD),
-        )))
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true }),
-        rows[0],
-    );
-
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            line2,
-            Style::default().fg(app.theme.color_subtext()),
-        )))
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true }),
-        rows[1],
-    );
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                line2,
+                Style::default().fg(app.theme.color_subtext()),
+            )))
+            .alignment(Alignment::Center)
+            .wrap(Wrap { trim: true }),
+            rows[1],
+        );
+    }
 }
 
 fn panel_bg_style(app: &App) -> Style {
