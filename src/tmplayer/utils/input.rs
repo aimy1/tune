@@ -38,7 +38,9 @@ pub enum Action {
     PlaylistMoveItemDown,
     PlaylistSelect(usize),
 
+    #[allow(dead_code)]
     PrevAlbum,
+    #[allow(dead_code)]
     NextAlbum,
 
     SeekToFraction(f32),
@@ -170,62 +172,40 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         };
     }
 
-    // global shortcuts (except folder input)
-    match ev.code {
-        KeyCode::Char('t') | KeyCode::Char('T') => return Action::OpenSettingsModal,
-        _ => {}
-    }
-
-    if keybind_matches(&config.keybind_fullscreen_eq, ev) {
-        return Action::OpenEqModal;
-    }
-
-    if ev.modifiers.contains(KeyModifiers::CONTROL) {
-        match ev.code {
-            // In Tune embedded mode, Ctrl+F folds fullscreen back to the host UI.
-            KeyCode::Char('f') | KeyCode::Char('F') => return Action::Quit,
-            KeyCode::Char('k') | KeyCode::Char('K') => return Action::OpenHelpModal,
-            _ => {}
-        }
-    }
-
     if overlay == Overlay::Playlist {
         if keybind_matches(&config.keybind_sidebar, ev) {
             return Action::TogglePlaylist;
         }
-        return match ev.code {
-            KeyCode::Esc => Action::CloseOverlay,
-            KeyCode::Enter => Action::Confirm,
-            KeyCode::Left => {
-                if ev.modifiers.contains(KeyModifiers::CONTROL) {
-                    Action::PrevAlbum
-                } else {
-                    Action::None
-                }
-            }
-            KeyCode::Right => {
-                if ev.modifiers.contains(KeyModifiers::CONTROL) {
-                    Action::NextAlbum
-                } else {
-                    Action::None
-                }
-            }
+        match ev.code {
+            KeyCode::Enter => return Action::Confirm,
             KeyCode::Up => {
                 if ev.modifiers.contains(KeyModifiers::CONTROL) {
-                    Action::PlaylistMoveItemUp
+                    return Action::PlaylistMoveItemUp;
                 } else {
-                    Action::PlaylistUp
+                    return Action::PlaylistUp;
                 }
             }
             KeyCode::Down => {
                 if ev.modifiers.contains(KeyModifiers::CONTROL) {
-                    Action::PlaylistMoveItemDown
+                    return Action::PlaylistMoveItemDown;
                 } else {
-                    Action::PlaylistDown
+                    return Action::PlaylistDown;
                 }
             }
-            _ => Action::None,
-        };
+            _ => {}
+        }
+    }
+
+    if keybind_matches(&config.keybind_fullscreen, ev) {
+        return Action::Quit;
+    }
+
+    if keybind_matches(&config.keybind_settings, ev) {
+        return Action::OpenSettingsModal;
+    }
+
+    if keybind_matches(&config.keybind_fullscreen_eq, ev) {
+        return Action::OpenEqModal;
     }
 
     if keybind_matches(&config.keybind_personal_center, ev) {
@@ -244,23 +224,33 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return Action::TogglePlaylist;
     }
 
-    if keybind_matches(&config.keybind_fullscreen_toggle_mode, ev) {
+    if keybind_matches(&config.keybind_fullscreen_toggle_mode, ev)
+        || keybind_matches(&config.keybind_toggle_mode, ev)
+    {
         return Action::ToggleRepeatMode;
     }
 
-    if keybind_matches(&config.keybind_toggle_like_fullscreen, ev) {
+    if keybind_matches(&config.keybind_toggle_like_fullscreen, ev)
+        || keybind_matches(&config.keybind_toggle_like_collapsed, ev)
+    {
         return Action::ToggleFavorite;
     }
 
-    if keybind_matches(&config.keybind_fullscreen_prev, ev) {
+    if keybind_matches(&config.keybind_fullscreen_prev, ev)
+        || keybind_matches(&config.keybind_prev, ev)
+    {
         return Action::Prev;
     }
 
-    if keybind_matches(&config.keybind_fullscreen_next, ev) {
+    if keybind_matches(&config.keybind_fullscreen_next, ev)
+        || keybind_matches(&config.keybind_next, ev)
+    {
         return Action::Next;
     }
 
-    if keybind_matches(&config.keybind_fullscreen_toggle_play_pause, ev) {
+    if keybind_matches(&config.keybind_fullscreen_toggle_play_pause, ev)
+        || keybind_matches(&config.keybind_toggle_play_pause, ev)
+    {
         return Action::TogglePlayPause;
     }
 
@@ -271,14 +261,23 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         if matches!(ev.code, KeyCode::Right) {
             return Action::SeekDelta(5.0);
         }
+        if matches!(ev.code, KeyCode::Char('k') | KeyCode::Char('K')) {
+            return Action::OpenHelpModal;
+        }
     }
 
     match ev.code {
+        KeyCode::Char('f') | KeyCode::Char('F') => Action::Quit,
+        KeyCode::Char('t') | KeyCode::Char('T') => Action::OpenSettingsModal,
+        KeyCode::Char('e') | KeyCode::Char('E') => Action::OpenEqModal,
+        KeyCode::Char('p') | KeyCode::Char('P') => Action::TogglePlaylist,
         KeyCode::Char('z') | KeyCode::Char('Z') => Action::OpenPersonalCenter,
-        KeyCode::Char('s') | KeyCode::Char('S') => Action::OpenSearch,
+        KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Char('/') => Action::OpenSearch,
         KeyCode::Char('q') | KeyCode::Char('Q') => Action::Quit,
         KeyCode::Char('m') | KeyCode::Char('M') => Action::ToggleRepeatMode,
         KeyCode::Char('l') | KeyCode::Char('L') => Action::ToggleFavorite,
+        KeyCode::Char('[') => Action::Prev,
+        KeyCode::Char(']') => Action::Next,
         KeyCode::Esc => Action::Quit,
         KeyCode::Enter => Action::Confirm,
         KeyCode::Left => Action::Prev,
