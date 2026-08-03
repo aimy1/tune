@@ -19,6 +19,8 @@ pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ: &str = "E";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ_RESET: &str = "Alt+R";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN: &str = "L";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED: &str = "Alt+L";
+#[allow(dead_code)]
+pub(crate) const DEFAULT_KEYBIND_PERSONAL_CENTER: &str = "Z";
 
 #[derive(Debug, Clone, Copy)]
 pub enum KeybindAction {
@@ -39,6 +41,7 @@ pub enum KeybindAction {
     FullscreenEqReset,
     ToggleLikeFullscreen,
     ToggleLikeCollapsed,
+    PersonalCenter,
 }
 
 pub fn keybind_matches(binding: &str, key: KeyEvent) -> bool {

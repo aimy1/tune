@@ -2539,6 +2539,7 @@ impl App {
             KeybindAction::FullscreenEqReset => {}
             KeybindAction::ToggleLikeFullscreen => {}
             KeybindAction::ToggleLikeCollapsed => self.toggle_like_hotkey().await,
+            KeybindAction::PersonalCenter => self.open_personal_center_page().await,
         }
     }
 
@@ -2644,6 +2645,7 @@ impl App {
             KeybindAction::FullscreenEqReset,
             KeybindAction::ToggleLikeFullscreen,
             KeybindAction::ToggleLikeCollapsed,
+            KeybindAction::PersonalCenter,
         ];
 
         actions
@@ -2672,6 +2674,7 @@ impl App {
             KeybindAction::FullscreenEqReset => &self.config.keybind_fullscreen_eq_reset,
             KeybindAction::ToggleLikeFullscreen => &self.config.keybind_toggle_like_fullscreen,
             KeybindAction::ToggleLikeCollapsed => &self.config.keybind_toggle_like_collapsed,
+            KeybindAction::PersonalCenter => &self.config.keybind_personal_center,
         }
     }
 
