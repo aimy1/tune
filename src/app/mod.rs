@@ -61,7 +61,7 @@ const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 10;
 const SETTINGS_PLAYBACK_ITEMS: usize = 10;
-pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 17;
+pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 18;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
 const STARTUP_LOADING_MIN_VISIBLE_SECS: f32 = 0.75;
@@ -2697,6 +2697,7 @@ impl App {
             14 => Some(&mut self.config.keybind_toggle_like_fullscreen),
             15 => Some(&mut self.config.keybind_toggle_mode),
             16 => Some(&mut self.config.keybind_toggle_like_collapsed),
+            17 => Some(&mut self.config.keybind_personal_center),
             _ => None,
         }
     }
@@ -2720,6 +2721,7 @@ impl App {
             14 => Some(self.config.keybind_toggle_like_fullscreen.as_str()),
             15 => Some(self.config.keybind_toggle_mode.as_str()),
             16 => Some(self.config.keybind_toggle_like_collapsed.as_str()),
+            17 => Some(self.config.keybind_personal_center.as_str()),
             _ => None,
         }
     }
@@ -2762,6 +2764,7 @@ impl App {
             14 => self.lang_text("全屏收藏/取消收藏", "Fullscreen Like/Unlike"),
             15 => self.lang_text("折叠栏模式切换", "Collapsed Mode Switch"),
             16 => self.lang_text("折叠栏收藏/取消收藏", "Collapsed Like/Unlike"),
+            17 => self.lang_text("个人主页/个人中心", "Personal Center"),
             _ => self.lang_text("未知", "Unknown"),
         }
     }
@@ -2788,6 +2791,7 @@ impl App {
             DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN.to_string();
         self.config.keybind_toggle_like_collapsed =
             DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED.to_string();
+        self.config.keybind_personal_center = DEFAULT_KEYBIND_PERSONAL_CENTER.to_string();
     }
 
     pub fn keybind_label_for_index(&self, index: usize) -> String {
@@ -2809,6 +2813,7 @@ impl App {
             14 => KeybindAction::ToggleLikeFullscreen,
             15 => KeybindAction::ToggleMode,
             16 => KeybindAction::ToggleLikeCollapsed,
+            17 => KeybindAction::PersonalCenter,
             _ => KeybindAction::SearchBox,
         });
         format!("{}: {}", self.keybind_name_for_index(index), value)

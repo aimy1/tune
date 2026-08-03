@@ -130,6 +130,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_toggle_like_fullscreen")]
     pub keybind_toggle_like_fullscreen: String,
+
+    #[serde(default = "default_keybind_personal_center")]
+    pub keybind_personal_center: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -349,6 +352,10 @@ fn default_keybind_toggle_like_fullscreen() -> String {
     "L".to_string()
 }
 
+fn default_keybind_personal_center() -> String {
+    "Z".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -394,6 +401,7 @@ impl Default for Config {
             keybind_fullscreen_eq: default_keybind_fullscreen_eq(),
             keybind_fullscreen_eq_reset: default_keybind_fullscreen_eq_reset(),
             keybind_toggle_like_fullscreen: default_keybind_toggle_like_fullscreen(),
+            keybind_personal_center: default_keybind_personal_center(),
         }
     }
 }
