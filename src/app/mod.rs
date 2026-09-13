@@ -4396,7 +4396,7 @@ impl App {
 
     fn handle_settings_about_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc | KeyCode::Left | KeyCode::Enter => {
+            KeyCode::Esc | KeyCode::Left | KeyCode::Enter | KeyCode::Char('q') | KeyCode::Char('Q') => {
                 self.overlay = Some(Overlay::Settings);
             }
             KeyCode::Char('t') | KeyCode::Char('T') => {

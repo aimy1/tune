@@ -905,8 +905,10 @@ fn render_about_text(f: &mut ratatui::Frame, area: Rect, app: &mut AppState) {
 
     let mut rendered: Vec<String> = Vec::new();
     for (k, v) in &info.links {
-        let line = if k.eq_ignore_ascii_case("github_url") {
-            v.to_string()
+        let line = if k.eq_ignore_ascii_case("github_url") || k.eq_ignore_ascii_case("github") {
+            format!("GitHub: {}", v)
+        } else if k.eq_ignore_ascii_case("issues_url") || k.eq_ignore_ascii_case("issues") {
+            format!("Issues: {}", v)
         } else {
             format!("{}: {}", k, v)
         };
