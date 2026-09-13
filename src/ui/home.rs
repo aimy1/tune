@@ -151,32 +151,11 @@ fn draw_tiles(frame: &mut Frame, app: &mut App, area: Rect) {
             ratatui::widgets::BorderType::Rounded
         };
 
-        let mut block = Block::default()
+        let block = Block::default()
             .borders(Borders::ALL)
             .border_type(border_type)
             .border_style(border_style)
             .style(tile_style);
-
-        if focused {
-            let focus_label = match app.config.language {
-                Language::Zh => "选中 ",
-                Language::En => "Focus ",
-            };
-            block = block.title(Line::from(vec![
-                Span::styled(
-                    " 󰐊 ",
-                    Style::default()
-                        .fg(app.theme.color_accent2())
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    focus_label,
-                    Style::default()
-                        .fg(app.theme.color_accent())
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]));
-        }
 
         frame.render_widget(block, rect);
 
