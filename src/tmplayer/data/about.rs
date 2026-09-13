@@ -11,12 +11,14 @@ pub struct BrailleImage {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AboutInfo {
+    #[allow(dead_code)]
     pub description: String,
     #[serde(default)]
     pub version: String,
     #[serde(default)]
     pub author: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub license: String,
     #[serde(default)]
     pub links: BTreeMap<String, String>,

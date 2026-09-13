@@ -2,16 +2,15 @@ use crate::app::App;
 use crate::data::config::Language;
 use crate::tmplayer::data::about::{BrailleImage, about_info};
 use ratatui::Frame;
-use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use unicode_width::UnicodeWidthChar;
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
-/// Modern concise About modal: clean rounded border with no border text,
-/// centered TUNE logo, airy metadata rows, tech stack badges, and soft exit hint.
+/// Minimalist About modal: clean rounded border with no border text,
+/// centered TUNE logo, concise essential info, and soft exit hint.
 pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
-    if size.width < 40 || size.height < 14 {
+    if size.width < 32 || size.height < 10 {
         draw_compact(frame, app, size);
         return;
     }
@@ -37,29 +36,13 @@ pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
         horizontal: 2,
         vertical: 1,
     });
-    if inner.width < 20 || inner.height < 6 {
-        return;
-    }
-
-    let top_h = if inner.height >= 16 { 7 } else { 2 };
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(top_h),
-            Constraint::Min(6),
-            Constraint::Length(1),
-        ])
-        .split(inner);
-
-    draw_top_section(frame, app, rows[0]);
-    draw_content_section(frame, app, rows[1]);
-    draw_footer(frame, app, rows[2]);
+    draw_about_content(frame, app, inner);
 }
 
 fn draw_compact(frame: &mut Frame, app: &App, size: Rect) {
     let area = centered_rect(
         size.width.saturating_sub(2).max(20),
-        size.height.saturating_sub(2).max(10),
+        size.height.saturating_sub(2).max(8),
         size,
     );
     frame.render_widget(Clear, area);
@@ -82,256 +65,81 @@ fn draw_compact(frame: &mut Frame, app: &App, size: Rect) {
         horizontal: 1,
         vertical: 1,
     });
-    draw_content_section(frame, app, inner);
+    draw_about_content(frame, app, inner);
 }
 
-fn draw_top_section(frame: &mut Frame, app: &App, area: Rect) {
-    if area.height == 0 || area.width == 0 {
+fn draw_about_content(frame: &mut Frame, app: &App, area: Rect) {
+    if area.width == 0 || area.height == 0 {
         return;
     }
 
     let info = about_info();
-    let show_logo_art = area.height >= 6 && area.width >= 26;
+    let mut lines: Vec<Line<'static>> = Vec::new();
 
-    if show_logo_art {
-        let logo_h = area.height.saturating_sub(2);
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(logo_h),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-        // 1. Centered logo art
-        let logo_lines = about_logo_lines(rows[0].width as usize, rows[0].height as usize);
-        frame.render_widget(
-            Paragraph::new(logo_lines)
-                .style(
-                    Style::default()
-                        .fg(app.theme.color_accent())
-                        .bg(app.theme.color_surface())
-                        .add_modifier(Modifier::BOLD),
-                )
-                .alignment(Alignment::Center),
-            rows[0],
-        );
-
-        // 2. Tagline with version
-        draw_tagline_line(frame, app, rows[1], info);
-
-        // 3. Horizontal divider line
-        draw_divider_line(frame, app, rows[2]);
-    } else {
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-        draw_tagline_line(frame, app, rows[0], info);
-        if area.height >= 2 {
-            draw_divider_line(frame, app, rows[1]);
-        }
+    // 1. Logo Art (if height allows)
+    let show_art = area.height >= 9 && area.width >= 26;
+    if show_art {
+        let logo_lines = about_logo_lines(area.width as usize, 5);
+        lines.extend(logo_lines);
+        lines.push(blank_line(app));
     }
-}
 
-fn draw_tagline_line(
-    frame: &mut Frame,
-    app: &App,
-    area: Rect,
-    info: &crate::tmplayer::data::about::AboutInfo,
-) {
+    // 2. Version
     let badge_style = Style::default()
         .fg(app.theme.color_base())
         .bg(app.theme.color_accent2())
         .add_modifier(Modifier::BOLD);
-    let tagline_style = Style::default()
-        .fg(app.theme.color_subtext())
-        .bg(app.theme.color_surface());
+    lines.push(Line::from(vec![
+        Span::styled(format!(" v{} ", info.version), badge_style),
+    ]));
 
-    let tagline = match app.config.language {
-        Language::Zh => "终端网易云音乐播放器",
-        Language::En => "NetEase Cloud Music TUI Player",
-    };
-
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(format!(" v{} ", info.version), badge_style),
-            Span::styled(
-                "  ·  ",
-                Style::default()
-                    .fg(app.theme.color_buff())
-                    .bg(app.theme.color_surface()),
-            ),
-            Span::styled(tagline, tagline_style),
-        ]))
-        .alignment(Alignment::Center),
-        area,
-    );
-}
-
-fn draw_divider_line(frame: &mut Frame, app: &App, area: Rect) {
-    let sep_len = (area.width as usize).saturating_sub(12).max(10);
-    let sep = "─".repeat(sep_len);
-    frame.render_widget(
-        Paragraph::new(sep)
-            .style(
-                Style::default()
-                    .fg(app.theme.color_buff())
-                    .bg(app.theme.color_surface()),
-            )
-            .alignment(Alignment::Center),
-        area,
-    );
-}
-
-fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
-    if area.width == 0 || area.height == 0 {
-        return;
-    }
-
-    let info = about_info();
-    let max_w = area.width as usize;
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    let compact_space = area.height < 9;
-
-    let author_val = if info.author.is_empty() {
+    // 3. Tagline & Author
+    let author = if info.author.is_empty() {
         "Asniya (@aimy1)"
     } else {
         info.author.as_str()
     };
-    let license_val = if info.license.is_empty() {
-        "GNU AGPL-3.0"
-    } else {
-        info.license.as_str()
+    let tagline = match app.config.language {
+        Language::Zh => format!("终端网易云音乐 · By {author}"),
+        Language::En => format!("NetEase Cloud Music TUI Player · By {author}"),
     };
+    lines.push(Line::from(Span::styled(
+        tagline,
+        Style::default()
+            .fg(app.theme.color_text())
+            .add_modifier(Modifier::BOLD),
+    )));
 
-    let spec_pill = |icon: &'static str, label: &str, val: &str| -> Vec<Span<'static>> {
-        vec![
-            Span::styled(
-                format!("{icon} "),
-                Style::default()
-                    .fg(app.theme.color_accent2())
-                    .bg(app.theme.color_surface()),
-            ),
-            Span::styled(
-                format!(" {label} "),
-                Style::default()
-                    .fg(app.theme.color_base())
-                    .bg(app.theme.color_buff())
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" ", Style::default().bg(app.theme.color_surface())),
-            Span::styled(
-                val.to_string(),
-                Style::default()
-                    .fg(app.theme.color_text())
-                    .bg(app.theme.color_surface()),
-            ),
-        ]
-    };
+    // 4. Repo Link
+    let repo_url = info
+        .links
+        .get("github_url")
+        .map(|s| s.as_str())
+        .unwrap_or("https://github.com/aimy1/tune");
+    lines.push(Line::from(Span::styled(
+        repo_url.to_string(),
+        Style::default()
+            .fg(app.theme.color_accent())
+            .add_modifier(Modifier::UNDERLINED),
+    )));
 
-    let (a_lbl, l_lbl) = match app.config.language {
-        Language::Zh => ("作者", "协议"),
-        Language::En => ("Author", "License"),
-    };
-    let repo_lbl = match app.config.language {
-        Language::Zh => "源码",
-        Language::En => "Repo",
-    };
-    let issues_lbl = match app.config.language {
-        Language::Zh => "反馈",
-        Language::En => "Issues",
-    };
-
-    if !compact_space {
+    // 5. Exit Hint
+    if area.height as usize > lines.len() + 1 {
         lines.push(blank_line(app));
     }
-
-    if max_w >= 60 {
-        let mut r1_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
-        r1_spans.extend(spec_pill("󰑣", a_lbl, author_val));
-        r1_spans.push(Span::styled("            ", Style::default().bg(app.theme.color_surface())));
-        r1_spans.extend(spec_pill("󰿃", l_lbl, license_val));
-        lines.push(Line::from(r1_spans));
-
-        let mut r2_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
-        r2_spans.extend(spec_pill("󰊤", repo_lbl, "https://github.com/aimy1/tune"));
-        lines.push(Line::from(r2_spans));
-
-        let mut r3_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
-        r3_spans.extend(spec_pill("󰋼", issues_lbl, "https://github.com/aimy1/tune/issues"));
-        lines.push(Line::from(r3_spans));
-    } else {
-        let items = [
-            ("󰑣", a_lbl, author_val.to_string()),
-            ("󰊤", repo_lbl, "https://github.com/aimy1/tune".to_string()),
-            ("󰋼", issues_lbl, "https://github.com/aimy1/tune/issues".to_string()),
-            ("󰿃", l_lbl, license_val.to_string()),
-        ];
-        for (icon, label, val) in items {
-            let mut spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
-            let val_budget = max_w.saturating_sub(16).max(8);
-            let clipped = clip_to_display_width(&val, val_budget);
-            spans.extend(spec_pill(icon, label, &clipped));
-            lines.push(Line::from(spans));
-        }
-    }
-
-    if !compact_space {
-        lines.push(blank_line(app));
-    }
-
-    // Centered Tech Stack pills
-    let chips = ["Rust 2024", "Ratatui", "Tokio", "Rodio", "MPRIS"];
-    let mut chip_spans = Vec::new();
-    for (i, chip) in chips.iter().enumerate() {
-        if i > 0 {
-            chip_spans.push(Span::styled("  ", Style::default().bg(app.theme.color_surface())));
-        }
-        chip_spans.push(Span::styled(
-            format!(" {chip} "),
-            Style::default()
-                .fg(app.theme.color_accent())
-                .bg(app.theme.color_buff())
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-    lines.push(Line::from(chip_spans));
+    let exit_hint = match app.config.language {
+        Language::Zh => "Esc / q  返回",
+        Language::En => "Esc / q  Back",
+    };
+    lines.push(Line::from(Span::styled(
+        exit_hint,
+        Style::default().fg(app.theme.color_subtext()),
+    )));
 
     frame.render_widget(
         Paragraph::new(lines)
             .style(Style::default().bg(app.theme.color_surface()))
-            .alignment(if max_w >= 60 { Alignment::Left } else { Alignment::Left })
-            .wrap(Wrap { trim: false }),
-        area,
-    );
-}
-
-fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
-    if area.width == 0 || area.height == 0 {
-        return;
-    }
-
-    let text = match app.config.language {
-        Language::Zh => "Esc / q  返回",
-        Language::En => "Esc / q  to return",
-    };
-
-    frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::styled(
-                text,
-                Style::default()
-                    .fg(app.theme.color_subtext())
-                    .bg(app.theme.color_surface()),
-            ),
-        ]))
-        .alignment(Alignment::Center),
+            .alignment(Alignment::Center),
         area,
     );
 }
@@ -350,13 +158,13 @@ fn surface_style(app: &App) -> Style {
 }
 
 fn modal_area(size: Rect) -> Rect {
-    let want_w = 68u16;
-    let want_h = 19u16;
+    let want_w = 58u16;
+    let want_h = 15u16;
 
     let max_w = size.width.saturating_sub(2);
     let max_h = size.height.saturating_sub(1);
-    let w = want_w.min(max_w).max(36.min(max_w));
-    let h = want_h.min(max_h).max(14.min(max_h));
+    let w = want_w.min(max_w).max(32.min(max_w));
+    let h = want_h.min(max_h).max(10.min(max_h));
     centered_rect(w, h, size)
 }
 
@@ -369,23 +177,6 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
         width: w,
         height: h,
     }
-}
-
-fn clip_to_display_width(text: &str, max_width: usize) -> String {
-    if max_width == 0 {
-        return String::new();
-    }
-    let mut out = String::new();
-    let mut used = 0;
-    for ch in text.chars() {
-        let w = ch.width().unwrap_or(0);
-        if used + w > max_width {
-            break;
-        }
-        out.push(ch);
-        used += w;
-    }
-    out
 }
 
 /// Center the logo in the panel; if the panel is smaller, crop from the center.
@@ -498,8 +289,8 @@ mod tests {
         let area = modal_area(terminal);
         assert!(area.width <= terminal.width);
         assert!(area.height <= terminal.height);
-        assert!(area.width >= 64);
-        assert!(area.height >= 18);
+        assert!(area.width >= 48);
+        assert!(area.height >= 12);
     }
 
     #[test]
