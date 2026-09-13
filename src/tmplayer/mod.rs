@@ -131,7 +131,7 @@ pub trait HostPlaybackBridge {
     async fn play_queue_index(&mut self, index: usize);
     fn seek_to_ratio(&mut self, ratio: f32);
     fn toggle_repeat_mode(&mut self);
-    async fn toggle_like_current(&mut self);
+    async fn toggle_like_current(&mut self) -> Result<bool, String>;
 }
 
 pub async fn run_fullscreen(

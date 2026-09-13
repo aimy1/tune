@@ -26,6 +26,7 @@ pub struct UiLayout {
     pub info_progress: Rect,
     pub info_volume: Rect,
     pub info_controls: Rect,
+    pub info_heart: Rect,
 
     pub info_cover_image: Rect,
 
@@ -151,6 +152,7 @@ impl Tui {
             layout_out.info_progress = info_l.progress;
             layout_out.info_controls = info_l.controls;
             layout_out.info_volume = control_buttons::volume_button_rect(info_l.controls, app);
+            layout_out.info_heart = info_l.heart;
 
             // For kitty graphics, we draw into the inner area (optional border).
             layout_out.info_cover_image = info_l.cover.inner(ratatui::layout::Margin {
@@ -1725,6 +1727,10 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
         return Some(Action::OpenVolumeModal);
     }
 
+    if contains(layout.info_heart, col, row) {
+        return Some(Action::ToggleFavorite);
+    }
+
     if contains(layout.info_progress, col, row) {
         return Some(Action::SeekToFraction(ratio_in_track(
             layout.info_progress,
@@ -1867,6 +1873,24 @@ mod tests {
 
         let v_key = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Char('v'));
         assert_eq!(map_key(v_key, Overlay::None, &config), Action::OpenVolumeModal);
+    }
+
+    #[test]
+    fn test_heart_hit_test() {
+        let app = AppState::new(
+            crate::tmplayer::data::config::Config::default(),
+            crate::tmplayer::ui::theme::Theme::default(),
+            crate::data::config::Language::Zh,
+        );
+
+        let mut layout = UiLayout::default();
+        layout.info_heart = Rect { x: 30, y: 5, width: 3, height: 1 };
+
+        let act = hit_test(&layout, &app, 31, 5);
+        assert_eq!(act, Some(Action::ToggleFavorite));
+
+        let act_miss = hit_test(&layout, &app, 29, 5);
+        assert_eq!(act_miss, None);
     }
 }
 

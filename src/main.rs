@@ -155,8 +155,8 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
         self.app.fullscreen_toggle_repeat_mode();
     }
 
-    async fn toggle_like_current(&mut self) {
-        self.app.fullscreen_toggle_like().await;
+    async fn toggle_like_current(&mut self) -> Result<bool, String> {
+        self.app.fullscreen_toggle_like().await
     }
 }
 

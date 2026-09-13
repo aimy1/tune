@@ -1997,7 +1997,7 @@ impl App {
                 }
                 if let Some(rect) = self.player_bar_hits.heart {
                     if rect.contains(col, row) {
-                        self.toggle_like_hotkey().await;
+                        let _ = self.toggle_like_hotkey().await;
                         return;
                     }
                 }
@@ -2469,8 +2469,8 @@ impl App {
         self.cycle_repeat_mode_hotkey();
     }
 
-    pub async fn fullscreen_toggle_like(&mut self) {
-        self.toggle_like_hotkey().await;
+    pub async fn fullscreen_toggle_like(&mut self) -> Result<bool, String> {
+        self.toggle_like_hotkey().await
     }
 
     async fn handle_overlay_key(&mut self, overlay: Overlay, key: KeyEvent) {
@@ -2542,7 +2542,9 @@ impl App {
             KeybindAction::FullscreenEq => {}
             KeybindAction::FullscreenEqReset => {}
             KeybindAction::ToggleLikeFullscreen => {}
-            KeybindAction::ToggleLikeCollapsed => self.toggle_like_hotkey().await,
+            KeybindAction::ToggleLikeCollapsed => {
+                let _ = self.toggle_like_hotkey().await;
+            }
             KeybindAction::PersonalCenter => self.open_personal_center_page().await,
         }
     }
@@ -2946,13 +2948,16 @@ impl App {
         }
     }
 
-    async fn toggle_like_hotkey(&mut self) {
+    async fn toggle_like_hotkey(&mut self) -> Result<bool, String> {
         let Some(song_id) = self.now_playing.as_ref().map(|track| track.song_id.clone()) else {
-            self.set_runtime_status(self.lang_text(
-                "当前没有可收藏的歌曲",
-                "No song is available for like/unlike",
-            ));
-            return;
+            let msg = self
+                .lang_text(
+                    "当前没有可收藏的歌曲",
+                    "No song is available for like/unlike",
+                )
+                .to_string();
+            self.set_runtime_status(&msg);
+            return Err(msg);
         };
 
         let target = !self.now_playing_liked;
@@ -2970,27 +2975,39 @@ impl App {
                         self.liked_song_ids.remove(&song_id);
                     }
                     self.now_playing_liked = self.liked_song_ids.contains(&song_id);
-                    self.set_runtime_status(if target {
+                    let msg = if target {
                         self.lang_text("已收藏当前歌曲", "Liked current song")
                             .to_string()
                     } else {
                         self.lang_text("已取消收藏当前歌曲", "Unliked current song")
                             .to_string()
-                    });
+                    };
+                    self.set_runtime_status(&msg);
+                    Ok(target)
+                } else if code == 301 {
+                    let msg = self
+                        .lang_text("需要登录网易云账号", "Please log in first")
+                        .to_string();
+                    self.set_runtime_status(&msg);
+                    Err(msg)
                 } else {
-                    self.set_runtime_status(format!(
+                    let msg = format!(
                         "{}: {}",
                         self.lang_text("收藏操作失败", "Like operation failed"),
                         code
-                    ));
+                    );
+                    self.set_runtime_status(&msg);
+                    Err(msg)
                 }
             }
             Err(err) => {
-                self.set_runtime_status(format!(
+                let msg = format!(
                     "{}: {}",
                     self.lang_text("收藏操作失败", "Like operation failed"),
                     err
-                ));
+                );
+                self.set_runtime_status(&msg);
+                Err(msg)
             }
         }
     }

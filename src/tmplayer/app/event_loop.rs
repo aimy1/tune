@@ -6,7 +6,7 @@ use crate::tmplayer::audio::cava::{CavaChannels, CavaConfig, CavaRunner};
 use crate::tmplayer::data::config::{AudioQuality, BarChannels, BarNumber, VisualizeMode};
 use crate::tmplayer::data::theme_loader::ThemeLoader;
 use crate::tmplayer::ui::theme::ThemeName;
-use crate::tmplayer::ui::tui::{Tui, UiLayout};
+use crate::tmplayer::ui::tui::{lang_text, Tui, UiLayout};
 use crate::tmplayer::utils::input::{Action, map_key, map_mouse};
 use crate::tmplayer::utils::system_volume::SystemVolume;
 use crate::tmplayer::{
@@ -1830,13 +1830,26 @@ async fn handle_action(
         }
         Action::ToggleFavorite => {
             if let Some(bridge) = host_bridge.as_mut() {
-                (*bridge).toggle_like_current().await;
+                let res = (*bridge).toggle_like_current().await;
                 let snapshot = (*bridge).snapshot();
                 sync_from_host_snapshot(app, snapshot);
+                match res {
+                    Ok(true) => {
+                        app.set_toast(lang_text(app, "已收藏当前歌曲", "Liked current song"))
+                    }
+                    Ok(false) => {
+                        app.set_toast(lang_text(app, "已取消收藏当前歌曲", "Unliked current song"))
+                    }
+                    Err(err) => app.set_toast(err),
+                }
                 return Ok(());
             }
 
-            app.set_toast("Like is unavailable in local mode");
+            app.set_toast(lang_text(
+                app,
+                "本地播放暂不支持收藏",
+                "Like is unavailable in local mode",
+            ));
         }
         Action::SeekToFraction(r) => {
             if let Some(bridge) = host_bridge.as_mut() {

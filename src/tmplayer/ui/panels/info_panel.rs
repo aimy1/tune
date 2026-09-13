@@ -6,7 +6,7 @@ use crate::tmplayer::ui::components::{control_buttons, progress_bar};
 use crate::tmplayer::utils::timefmt;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use std::collections::hash_map::DefaultHasher;
@@ -18,6 +18,7 @@ pub struct InfoPanelLayout {
     pub inner: Rect,
     pub cover: Rect,
     pub meta: Rect,
+    pub heart: Rect,
     pub progress: Rect,
     pub volume: Rect,
     pub controls: Rect,
@@ -114,10 +115,24 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
         height: CONTROLS_H,
     };
 
+    let heart = if meta.height >= 1 && progress.height >= 1 && controls.height >= 1 {
+        let heart_w = 3.min(meta.width);
+        let heart_x = meta.x + meta.width.saturating_sub(heart_w);
+        Rect {
+            x: heart_x,
+            y: meta.y,
+            width: heart_w,
+            height: 1,
+        }
+    } else {
+        Rect::default()
+    };
+
     InfoPanelLayout {
         inner,
         cover,
         meta,
+        heart,
         progress,
         volume: controls,
         controls,
@@ -315,6 +330,13 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
 
         let text_style = Style::default().fg(app.theme.color_text());
         let sub_style = Style::default().fg(app.theme.color_subtext());
+        let heart_style = if app.player.liked {
+            Style::default()
+                .fg(app.theme.color_accent3())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            sub_style
+        };
 
         let meta_rect = Rect {
             x: l.meta.x,
@@ -323,9 +345,18 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
             height: 1,
         };
 
-        let title_line = compose_left_right_line(title, heart, meta_rect.width as usize);
-        let t = Paragraph::new(Line::from(vec![Span::styled(title_line, text_style)]))
-            .alignment(Alignment::Left);
+        let heart_w = UnicodeWidthStr::width(heart).min(meta_rect.width as usize);
+        let left_max = (meta_rect.width as usize).saturating_sub(heart_w + 1);
+        let left_text = clip_to_display_width(title, left_max);
+        let used = UnicodeWidthStr::width(left_text.as_str()) + heart_w;
+        let pad = (meta_rect.width as usize).saturating_sub(used);
+
+        let title_spans = vec![
+            Span::styled(left_text, text_style),
+            Span::styled(" ".repeat(pad), text_style),
+            Span::styled(heart, heart_style),
+        ];
+        let t = Paragraph::new(Line::from(title_spans)).alignment(Alignment::Left);
         f.render_widget(t, meta_rect);
 
         let a = Paragraph::new(clip_to_display_width(artist, meta_rect.width as usize))
@@ -637,6 +668,7 @@ fn clip_to_display_width(text: &str, max_width: usize) -> String {
     out
 }
 
+#[allow(dead_code)]
 fn compose_left_right_line(left: &str, right: &str, width: usize) -> String {
     if width == 0 {
         return String::new();
@@ -697,6 +729,16 @@ mod tests {
         assert_eq!(l.volume.height, 1);
         assert!(l.volume.width > 0);
         assert_eq!(l.volume_label.height, 0);
+    }
+
+    #[test]
+    fn test_info_panel_heart_layout() {
+        let area = Rect { x: 0, y: 0, width: 40, height: 20 };
+        let l = layout(area);
+        assert_eq!(l.heart.height, 1);
+        assert_eq!(l.heart.y, l.meta.y);
+        assert_eq!(l.heart.width, 3);
+        assert_eq!(l.heart.x, l.meta.x + l.meta.width - 3);
     }
 }
 
