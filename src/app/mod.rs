@@ -61,7 +61,7 @@ const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 10;
 const SETTINGS_PLAYBACK_ITEMS: usize = 10;
-pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 18;
+pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 19;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
 const STARTUP_LOADING_MIN_VISIBLE_SECS: f32 = 0.75;
@@ -1631,6 +1631,7 @@ pub struct App {
     pub startup_loading_progress: f32,
     pub player_bar_hits: PlayerBarHitTargets,
     pub user_profile_hit: Option<HitRect>,
+    pub header_home_hit: Option<HitRect>,
     pub home_sidebar_panel_hit: Option<HitRect>,
     pub home_sidebar_playlist_hits: Vec<(HitRect, HomeSidebarHit)>,
     pub home_tile_hits: Vec<(HitRect, usize)>,
@@ -1752,6 +1753,7 @@ impl App {
             startup_loading_progress: 0.0,
             player_bar_hits: PlayerBarHitTargets::default(),
             user_profile_hit: None,
+            header_home_hit: None,
             home_sidebar_panel_hit: None,
             home_sidebar_playlist_hits: Vec::new(),
             home_tile_hits: Vec::new(),
@@ -1954,6 +1956,14 @@ impl App {
             && matches!(key.code, KeyCode::Char('v') | KeyCode::Char('V'))
         {
             self.toggle_volume_modal();
+            return;
+        }
+
+        if self.page != Page::Login
+            && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
+            && matches!(key.code, KeyCode::Char('x') | KeyCode::Char('X'))
+        {
+            self.go_to_home_page();
             return;
         }
 
@@ -2178,6 +2188,7 @@ impl App {
 
     pub fn clear_content_hits(&mut self) {
         self.user_profile_hit = None;
+        self.header_home_hit = None;
         self.home_sidebar_panel_hit = None;
         self.home_sidebar_playlist_hits.clear();
         self.home_tile_hits.clear();
@@ -2188,6 +2199,15 @@ impl App {
 
     pub fn set_user_profile_hit(&mut self, rect: Rect) {
         self.user_profile_hit = Some(HitRect {
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+        });
+    }
+
+    pub fn set_header_home_hit(&mut self, rect: Rect) {
+        self.header_home_hit = Some(HitRect {
             x: rect.x,
             y: rect.y,
             width: rect.width,
@@ -2731,6 +2751,17 @@ impl App {
                 let _ = self.toggle_like_hotkey().await;
             }
             KeybindAction::PersonalCenter => self.open_personal_center_page().await,
+            KeybindAction::Home => self.go_to_home_page(),
+        }
+    }
+
+    pub fn go_to_home_page(&mut self) {
+        if self.home_sidebar.expanded {
+            self.home_sidebar.expanded = false;
+        }
+        if self.page != Page::Home {
+            self.page = Page::Home;
+            self.set_runtime_status(self.lang_text("已进入首页", "Entered Home"));
         }
     }
 
@@ -2837,6 +2868,7 @@ impl App {
             KeybindAction::ToggleLikeFullscreen,
             KeybindAction::ToggleLikeCollapsed,
             KeybindAction::PersonalCenter,
+            KeybindAction::Home,
         ];
 
         actions
@@ -2866,6 +2898,7 @@ impl App {
             KeybindAction::ToggleLikeFullscreen => &self.config.keybind_toggle_like_fullscreen,
             KeybindAction::ToggleLikeCollapsed => &self.config.keybind_toggle_like_collapsed,
             KeybindAction::PersonalCenter => &self.config.keybind_personal_center,
+            KeybindAction::Home => &self.config.keybind_home,
         }
     }
 
@@ -2889,6 +2922,7 @@ impl App {
             15 => Some(&mut self.config.keybind_toggle_mode),
             16 => Some(&mut self.config.keybind_toggle_like_collapsed),
             17 => Some(&mut self.config.keybind_personal_center),
+            18 => Some(&mut self.config.keybind_home),
             _ => None,
         }
     }
@@ -2913,6 +2947,7 @@ impl App {
             15 => Some(self.config.keybind_toggle_mode.as_str()),
             16 => Some(self.config.keybind_toggle_like_collapsed.as_str()),
             17 => Some(self.config.keybind_personal_center.as_str()),
+            18 => Some(self.config.keybind_home.as_str()),
             _ => None,
         }
     }
@@ -2956,6 +2991,7 @@ impl App {
             15 => self.lang_text("折叠栏模式切换", "Collapsed Mode Switch"),
             16 => self.lang_text("折叠栏收藏/取消收藏", "Collapsed Like/Unlike"),
             17 => self.lang_text("个人主页/个人中心", "Personal Center"),
+            18 => self.lang_text("进入首页", "Home"),
             _ => self.lang_text("未知", "Unknown"),
         }
     }
@@ -2983,6 +3019,7 @@ impl App {
         self.config.keybind_toggle_like_collapsed =
             DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED.to_string();
         self.config.keybind_personal_center = DEFAULT_KEYBIND_PERSONAL_CENTER.to_string();
+        self.config.keybind_home = DEFAULT_KEYBIND_HOME.to_string();
     }
 
     pub fn keybind_label_for_index(&self, index: usize) -> String {
@@ -3005,6 +3042,7 @@ impl App {
             15 => KeybindAction::ToggleMode,
             16 => KeybindAction::ToggleLikeCollapsed,
             17 => KeybindAction::PersonalCenter,
+            18 => KeybindAction::Home,
             _ => KeybindAction::SearchBox,
         });
         format!("{}: {}", self.keybind_name_for_index(index), value)
@@ -4832,6 +4870,13 @@ impl App {
     }
 
     async fn handle_content_click(&mut self, col: u16, row: u16) -> bool {
+        if let Some(hit) = self.header_home_hit {
+            if hit.contains(col, row) {
+                self.go_to_home_page();
+                return true;
+            }
+        }
+
         if let Some(hit) = self.user_profile_hit {
             if hit.contains(col, row) {
                 self.open_personal_center_page().await;

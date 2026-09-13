@@ -21,6 +21,7 @@ pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN: &str = "L";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED: &str = "Alt+L";
 #[allow(dead_code)]
 pub(crate) const DEFAULT_KEYBIND_PERSONAL_CENTER: &str = "Z";
+pub(crate) const DEFAULT_KEYBIND_HOME: &str = "X";
 
 #[derive(Debug, Clone, Copy)]
 pub enum KeybindAction {
@@ -42,6 +43,7 @@ pub enum KeybindAction {
     ToggleLikeFullscreen,
     ToggleLikeCollapsed,
     PersonalCenter,
+    Home,
 }
 
 pub fn keybind_matches(binding: &str, key: KeyEvent) -> bool {
@@ -237,5 +239,30 @@ fn key_code_to_keybind_token(code: KeyCode) -> Option<String> {
         }
         KeyCode::Esc => Some("Esc".to_string()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyEventKind;
+
+    #[test]
+    fn test_home_keybind_matches() {
+        let ev_lower = KeyEvent {
+            code: KeyCode::Char('x'),
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert!(keybind_matches(DEFAULT_KEYBIND_HOME, ev_lower));
+
+        let ev_caps = KeyEvent {
+            code: KeyCode::Char('X'),
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert!(keybind_matches(DEFAULT_KEYBIND_HOME, ev_caps));
     }
 }

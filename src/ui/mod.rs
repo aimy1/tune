@@ -24,12 +24,13 @@ pub fn draw_header_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     }
 
     let transparent = app.config.transparent_background;
+    let surface = app.theme.color_surface();
     let bar_bg = app.theme.style_surface_bg(transparent);
-    let with_bar_bg = |s: Style| {
+    let with_bar_bg = move |s: Style| {
         if transparent {
             s
         } else {
-            s.bg(app.theme.color_surface())
+            s.bg(surface)
         }
     };
 
@@ -105,6 +106,7 @@ pub fn draw_header_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         })
         .split(inner);
 
+    app.set_header_home_hit(header_cols[0]);
     frame.render_widget(
         Paragraph::new(Line::from(left_spans)).alignment(Alignment::Left),
         header_cols[0],

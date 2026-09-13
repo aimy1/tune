@@ -309,6 +309,10 @@ async fn launch_tmplayer_fullscreen(
             bridge.app.open_personal_center_page().await;
             String::new()
         }
+        Ok(tmplayer::FullscreenExit::BackToHostOpenHome) => {
+            bridge.app.go_to_home_page();
+            String::new()
+        }
         Ok(tmplayer::FullscreenExit::QuitApp) => {
             bridge.app.should_quit = true;
             String::new()

@@ -190,6 +190,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_personal_center")]
     pub keybind_personal_center: String,
+
+    #[serde(default = "default_keybind_home")]
+    pub keybind_home: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -507,6 +510,10 @@ fn default_keybind_personal_center() -> String {
     "Z".to_string()
 }
 
+fn default_keybind_home() -> String {
+    "X".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -558,6 +565,7 @@ impl Default for Config {
             keybind_toggle_like_fullscreen: default_keybind_toggle_like_fullscreen(),
             keybind_toggle_like_collapsed: default_keybind_toggle_like_collapsed(),
             keybind_personal_center: default_keybind_personal_center(),
+            keybind_home: default_keybind_home(),
         }
     }
 }

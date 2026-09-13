@@ -50,6 +50,7 @@ pub enum Action {
 
     OpenSearch,
     OpenPersonalCenter,
+    OpenHome,
 
     FolderChar(char),
     FolderBackspace,
@@ -229,6 +230,10 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return Action::OpenPersonalCenter;
     }
 
+    if keybind_matches(&config.keybind_home, ev) {
+        return Action::OpenHome;
+    }
+
     if keybind_matches(&config.keybind_search_box, ev) {
         return Action::OpenSearch;
     }
@@ -290,6 +295,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         KeyCode::Char('e') | KeyCode::Char('E') => Action::OpenEqModal,
         KeyCode::Char('p') | KeyCode::Char('P') => Action::TogglePlaylist,
         KeyCode::Char('z') | KeyCode::Char('Z') => Action::OpenPersonalCenter,
+        KeyCode::Char('x') | KeyCode::Char('X') => Action::OpenHome,
         KeyCode::Char('s') | KeyCode::Char('S') | KeyCode::Char('/') => Action::OpenSearch,
         KeyCode::Char('q') | KeyCode::Char('Q') => Action::Quit,
         KeyCode::Char('m') | KeyCode::Char('M') => Action::ToggleRepeatMode,
@@ -495,5 +501,31 @@ fn key_code_to_keybind_token(code: KeyCode) -> Option<String> {
         }
         KeyCode::Esc => Some("Esc".to_string()),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyEventKind;
+
+    #[test]
+    fn test_x_maps_to_open_home() {
+        let config = Config::default();
+        let ev_lower = KeyEvent {
+            code: KeyCode::Char('x'),
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert_eq!(map_key(ev_lower, Overlay::None, &config), Action::OpenHome);
+
+        let ev_upper = KeyEvent {
+            code: KeyCode::Char('X'),
+            modifiers: KeyModifiers::SHIFT,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert_eq!(map_key(ev_upper, Overlay::None, &config), Action::OpenHome);
     }
 }

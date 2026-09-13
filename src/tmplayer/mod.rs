@@ -54,6 +54,7 @@ pub enum FullscreenExit {
     BackToHostOpenSettings,
     BackToHostOpenSearch,
     BackToHostOpenPersonalCenter,
+    BackToHostOpenHome,
     #[allow(dead_code)]
     QuitApp,
 }
@@ -240,6 +241,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         keybind_toggle_like_fullscreen: host.keybind_toggle_like_fullscreen.clone(),
         keybind_toggle_like_collapsed: host.keybind_toggle_like_collapsed.clone(),
         keybind_personal_center: host.keybind_personal_center.clone(),
+        keybind_home: host.keybind_home.clone(),
     }
 }
 

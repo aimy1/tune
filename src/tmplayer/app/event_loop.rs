@@ -978,6 +978,9 @@ async fn handle_action(
         Action::OpenPersonalCenter => {
             app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHostOpenPersonalCenter);
         }
+        Action::OpenHome => {
+            app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHostOpenHome);
+        }
         Action::SeekDelta(delta) => {
             let pos = app.player.position;
             let dur = app.player.track.duration;
