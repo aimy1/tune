@@ -19,6 +19,8 @@ pub enum Action {
 
     OpenSettingsModal,
     OpenHelpModal,
+    OpenVolumeModal,
+    ToggleMute,
 
     OpenEqModal,
 
@@ -95,12 +97,15 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     // modal-specific handling first
     if overlay == Overlay::SettingsModal {
+        if keybind_matches(&config.keybind_settings, ev) {
+            return Action::CloseOverlay;
+        }
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
             KeyCode::Char('t') | KeyCode::Char('T') => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up => Action::ModalUp,
-            KeyCode::Down => Action::ModalDown,
+            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
             KeyCode::Left => Action::ModalLeft,
             KeyCode::Right => Action::ModalRight,
             _ => Action::None,
@@ -111,8 +116,8 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up => Action::ModalUp,
-            KeyCode::Down => Action::ModalDown,
+            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
             KeyCode::Left => Action::ModalLeft,
             KeyCode::Right => Action::ModalRight,
             _ => Action::None,
@@ -123,8 +128,8 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up => Action::ModalUp,
-            KeyCode::Down => Action::ModalDown,
+            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
             KeyCode::Left => Action::ModalLeft,
             KeyCode::Right => Action::ModalRight,
             _ => Action::None,
@@ -143,8 +148,8 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up => Action::ModalUp,
-            KeyCode::Down => Action::ModalDown,
+            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
             KeyCode::Left => Action::ModalLeft,
             KeyCode::Right => Action::ModalRight,
             _ => Action::None,
@@ -159,6 +164,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         }
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
+            KeyCode::Enter => Action::Confirm,
             KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
             KeyCode::Down | KeyCode::Tab => Action::ModalDown,
             _ => Action::None,
@@ -167,7 +173,18 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     if overlay == Overlay::AboutModal {
         return match ev.code {
-            KeyCode::Esc => Action::CloseOverlay,
+            KeyCode::Esc | KeyCode::Enter => Action::CloseOverlay,
+            _ => Action::None,
+        };
+    }
+
+    if overlay == Overlay::VolumeModal {
+        return match ev.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => Action::CloseOverlay,
+            KeyCode::Enter => Action::CloseOverlay,
+            KeyCode::Left | KeyCode::Down => Action::VolumeDown,
+            KeyCode::Right | KeyCode::Up => Action::VolumeUp,
+            KeyCode::Char(' ') | KeyCode::Char('m') | KeyCode::Char('M') => Action::ToggleMute,
             _ => Action::None,
         };
     }
@@ -268,6 +285,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     match ev.code {
         KeyCode::Char('f') | KeyCode::Char('F') => Action::Quit,
+        KeyCode::Char('v') | KeyCode::Char('V') => Action::OpenVolumeModal,
         KeyCode::Char('t') | KeyCode::Char('T') => Action::OpenSettingsModal,
         KeyCode::Char('e') | KeyCode::Char('E') => Action::OpenEqModal,
         KeyCode::Char('p') | KeyCode::Char('P') => Action::TogglePlaylist,
@@ -290,13 +308,15 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 }
 
 pub fn map_mouse(ev: MouseEvent) -> Action {
-    if let MouseEventKind::Down(MouseButton::Left) = ev.kind {
-        return Action::MouseClick {
+    match ev.kind {
+        MouseEventKind::Down(MouseButton::Left) => Action::MouseClick {
             col: ev.column,
             row: ev.row,
-        };
+        },
+        MouseEventKind::ScrollUp => Action::VolumeUp,
+        MouseEventKind::ScrollDown => Action::VolumeDown,
+        _ => Action::None,
     }
-    Action::None
 }
 
 fn keybind_matches(binding: &str, key: KeyEvent) -> bool {

@@ -594,7 +594,8 @@ pub async fn run(
         &mut host_bridge,
         &mut last_host_metadata_signature,
         true,
-    );
+    )
+    .await;
 
     loop {
         let frame_start = Instant::now();
@@ -996,6 +997,9 @@ async fn handle_action(
                 .min(HELP_MODAL_ITEMS.saturating_sub(1));
             app.overlay = Overlay::HelpModal;
         }
+        Action::OpenVolumeModal => {
+            app.overlay = Overlay::VolumeModal;
+        }
         Action::OpenEqModal => {
             app.overlay = Overlay::EqModal;
             app.eq_selected = 0;
@@ -1042,6 +1046,7 @@ async fn handle_action(
                 || app.overlay == Overlay::BarSettingsModal
                 || app.overlay == Overlay::LocalAudioSettingsModal
                 || app.overlay == Overlay::AboutModal
+                || app.overlay == Overlay::HelpModal
             {
                 app.overlay = Overlay::SettingsModal;
             } else {
@@ -1159,6 +1164,7 @@ async fn handle_action(
                     app.overlay = Overlay::BarSettingsModal;
                 }
                 5 => {
+                    app.help_keybind_selected = 0;
                     app.overlay = Overlay::HelpModal;
                 }
                 6 => {
@@ -1220,6 +1226,10 @@ async fn handle_action(
                     app.config.playback_memory = !app.config.playback_memory;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
+                9 => {
+                    app.config.transparent_sidebar = !app.config.transparent_sidebar;
+                    save_and_sync_host_config(app, host_bridge).await;
+                }
                 _ => {}
             },
             Overlay::LocalAudioSettingsModal => match app.local_audio_settings_selected {
@@ -1266,8 +1276,8 @@ async fn handle_action(
                 let _ = app.config.save();
                 app.overlay = Overlay::SettingsModal;
             }
-            Overlay::HelpModal => {
-                app.close_overlay();
+            Overlay::HelpModal | Overlay::AboutModal => {
+                app.overlay = Overlay::SettingsModal;
             }
             Overlay::EqModal => {
                 app.close_overlay();
@@ -1388,7 +1398,7 @@ async fn handle_action(
                     app.settings_selected -= 1;
                 }
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 9;
+                let count = 10;
                 if app.bar_settings_selected == 0 {
                     app.bar_settings_selected = count - 1;
                 } else {
@@ -1421,7 +1431,7 @@ async fn handle_action(
                 let count = 10;
                 app.settings_selected = (app.settings_selected + 1) % count;
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 9;
+                let count = 10;
                 app.bar_settings_selected = (app.bar_settings_selected + 1) % count;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 let count = 5;
@@ -1481,6 +1491,10 @@ async fn handle_action(
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
+                    9 => {
+                        app.config.transparent_sidebar = !app.config.transparent_sidebar;
+                        save_and_sync_host_config(app, host_bridge).await;
+                    }
                     _ => {}
                 }
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
@@ -1536,6 +1550,10 @@ async fn handle_action(
                     }
                     8 => {
                         app.config.playback_memory = !app.config.playback_memory;
+                        save_and_sync_host_config(app, host_bridge).await;
+                    }
+                    9 => {
+                        app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     _ => {}
@@ -1781,6 +1799,23 @@ async fn handle_action(
                     }
                 }
             }
+        },
+        Action::ToggleMute => {
+            let target_vol = if app.player.volume > 0.001 {
+                app.pre_mute_volume = Some(app.player.volume);
+                0.0
+            } else {
+                app.pre_mute_volume.unwrap_or(0.5).clamp(0.05, 1.0)
+            };
+            Box::pin(handle_action(
+                app,
+                mode_manager,
+                system_volume,
+                host_bridge,
+                Action::SetVolume(target_vol),
+                layout,
+            ))
+            .await?;
         },
         Action::ToggleRepeatMode => {
             if let Some(bridge) = host_bridge.as_mut() {

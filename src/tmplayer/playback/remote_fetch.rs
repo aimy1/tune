@@ -214,7 +214,7 @@ fn process_request(req: RemoteFetchRequest) -> Option<RemoteFetchResult> {
                 if duration_secs == 0 {
                     duration_secs = fp_dur as u64;
                 }
-                if let Some(ac) = acoustid_lookup(key, &fp, fp_dur as u32) {
+                if let Some(ac) = acoustid_lookup(key, &fp, fp_dur) {
                     if let Some(t) = ac.title {
                         if is_unknown(&title) {
                             title = t.clone();
@@ -553,11 +553,7 @@ fn chromaprint_fingerprint(path: &Path) -> Option<(String, u32)> {
     let mut total_frames: u64 = 0;
     let mut sample_buf: Option<SampleBuffer<i16>> = None;
 
-    loop {
-        let packet = match format.next_packet() {
-            Ok(p) => p,
-            Err(_) => break,
-        };
+    while let Ok(packet) = format.next_packet() {
 
         if packet.track_id() != track_id {
             continue;

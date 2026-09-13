@@ -64,7 +64,7 @@ impl ThemeLoader {
 
 fn parse_hex(raw: &str) -> (u8, u8, u8) {
     let hex = raw.trim().trim_start_matches('#');
-    if hex.len() != 6 {
+    if !hex.is_ascii() || hex.len() != 6 {
         return (255, 255, 255);
     }
 
@@ -117,4 +117,24 @@ fn is_toml_key(line: &str, key: &str) -> bool {
         return false;
     }
     trimmed[key.len()..].trim_start().starts_with('=')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_hex_ascii() {
+        assert_eq!(parse_hex("#123456"), (0x12, 0x34, 0x56));
+        assert_eq!(parse_hex("ffffff"), (255, 255, 255));
+    }
+
+    #[test]
+    fn test_parse_hex_non_ascii_no_panic() {
+        // "你好" is 6 bytes in UTF-8, previously would panic on &hex[0..2]
+        assert_eq!(parse_hex("#你好"), (255, 255, 255));
+        assert_eq!(parse_hex("你好"), (255, 255, 255));
+        assert_eq!(parse_hex(""), (255, 255, 255));
+        assert_eq!(parse_hex("123"), (255, 255, 255));
+    }
 }

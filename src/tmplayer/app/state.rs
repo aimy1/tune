@@ -232,6 +232,7 @@ pub enum Overlay {
     AcoustIdModal,
     HelpModal,
     EqModal,
+    VolumeModal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -287,6 +288,7 @@ pub struct AppState {
     pub eq_selected: usize,
 
     pub acoustid_input: String,
+    pub pre_mute_volume: Option<f32>,
 
     // Folder that backs the *current playback queue* (contains audio files).
     pub local_folder: Option<PathBuf>,
@@ -409,6 +411,7 @@ impl AppState {
             eq_selected: 0,
 
             acoustid_input: String::new(),
+            pre_mute_volume: None,
 
             local_folder: None,
             local_root_folder: None,

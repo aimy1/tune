@@ -5,6 +5,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
+#[allow(dead_code)]
 pub fn render(f: &mut Frame, area: Rect, app: &AppState, vol: f32) {
     let w = area.width as usize;
     if w == 0 {

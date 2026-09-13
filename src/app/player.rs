@@ -224,14 +224,36 @@ impl AudioPlayer {
     }
 
     pub fn seek_to_ratio(&mut self, ratio: f32, fallback_total: Option<Duration>) -> Result<()> {
-        let Some(path) = self.current_file_path.clone() else {
+        let Some(base_path) = self.current_file_path.clone() else {
             return Ok(());
         };
         let Some(total) = self.total_duration.or(fallback_total) else {
             return Ok(());
         };
 
-        let target = Duration::from_secs_f32(total.as_secs_f32() * ratio.clamp(0.0, 1.0));
+        let ratio = ratio.clamp(0.0, 1.0);
+        if let Some((downloaded, total_bytes)) = self.progress_rx.as_ref().map(|rx| *rx.borrow()) {
+            if total_bytes > 0 && downloaded < total_bytes {
+                let downloaded_ratio = downloaded as f32 / total_bytes as f32;
+                if ratio > downloaded_ratio {
+                    // Cannot seek beyond downloaded buffer during streaming
+                    return Ok(());
+                }
+            }
+        }
+
+        let path = if base_path.is_file() {
+            base_path
+        } else {
+            let part = base_path.with_extension("part");
+            if part.is_file() {
+                part
+            } else {
+                return Ok(());
+            }
+        };
+
+        let target = Duration::from_secs_f32(total.as_secs_f32() * ratio);
         let was_paused = matches!(self.state(), AudioPlayerState::Paused);
 
         let file = File::open(&path)

@@ -11,9 +11,10 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use std::io::{self, Stdout};
+use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct UiLayout {
@@ -148,8 +149,8 @@ impl Tui {
 
             let info_l = info_panel::layout(cols[0]);
             layout_out.info_progress = info_l.progress;
-            layout_out.info_volume = info_l.volume;
             layout_out.info_controls = info_l.controls;
+            layout_out.info_volume = control_buttons::volume_button_rect(info_l.controls, app);
 
             // For kitty graphics, we draw into the inner area (optional border).
             layout_out.info_cover_image = info_l.cover.inner(ratatui::layout::Margin {
@@ -274,6 +275,7 @@ impl Tui {
                 Overlay::AcoustIdModal => render_acoustid_modal(f, size, app),
                 Overlay::HelpModal => render_help_modal(f, size, app),
                 Overlay::EqModal => render_eq_modal(f, size, app),
+                Overlay::VolumeModal => render_volume_modal(f, size, app),
                 _ => {}
             }
         })?;
@@ -342,6 +344,16 @@ fn centered_rect(size: Rect, width: u16, height: u16) -> Rect {
     }
 }
 
+fn format_setting_line(prefix: &str, key: &str, val: &str, width: u16) -> String {
+    let prefix_w = UnicodeWidthStr::width(prefix);
+    let key_w = UnicodeWidthStr::width(key);
+    let val_w = UnicodeWidthStr::width(val);
+
+    let padding_budget = (width as usize).saturating_sub(prefix_w + key_w + val_w + 2);
+    let pad = " ".repeat(padding_budget);
+    format!(" {prefix}{key}{pad}{val} ")
+}
+
 fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     let area = centered_rect(size, 70, 20);
     f.render_widget(ratatui::widgets::Clear, area);
@@ -350,6 +362,11 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
         .borders(Borders::ALL)
         .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
         .title(lang_text(app, " 设置 ", " Settings "))
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
         .style(
             Style::default()
                 .fg(app.theme.color_subtext())
@@ -370,62 +387,89 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
             Constraint::Length(1),
         ])
         .split(inner);
-    f.render_widget(Paragraph::new(""), rows[0]);
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
 
     let language_label = match app.language {
-        crate::data::config::Language::Zh => "中文",
+        crate::data::config::Language::Zh => lang_text(app, "中文", "Chinese"),
         crate::data::config::Language::En => "English",
     };
 
-    let items = vec![
-        format!("{}: {}", lang_text(app, "主题", "Theme"), app.config.theme),
-        format!(
-            "{}: {}",
+    let raw_items = vec![
+        (
+            lang_text(app, "主题", "Theme"),
+            app.config.theme.clone(),
+        ),
+        (
             lang_text(app, "背景透明", "Transparent Background"),
-            lang_on_off(app, app.config.transparent_background)
+            lang_on_off(app, app.config.transparent_background).to_string(),
         ),
-        format!("{}: {}", lang_text(app, "语言", "Language"), language_label),
-        format!(
-            "{}: {}",
-            lang_text(app, "图形协议", "Graphics"),
-            app.config.graphics_protocol.display_name()
+        (
+            lang_text(app, "语言", "Language"),
+            language_label.to_string(),
         ),
-        format!("{}...", lang_text(app, "播放设置", "Playback Settings")),
-        format!("{}...", lang_text(app, "按键绑定", "Keybinds")),
-        format!(
-            "{}: {}",
+        (
+            lang_text(app, "图像协议", "Image Protocol"),
+            app.config.graphics_protocol.display_name().to_string(),
+        ),
+        (
+            lang_text(app, "播放设置", "Playback Settings"),
+            "...".to_string(),
+        ),
+        (
+            lang_text(app, "按键绑定", "Keybinds"),
+            "...".to_string(),
+        ),
+        (
             lang_text(app, "显示提示", "Show Hints"),
-            lang_on_off(app, app.config.show_hints)
+            lang_on_off(app, app.config.show_hints).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "主页更多推荐", "More Home Recommendations"),
-            lang_on_off(app, app.config.home_more_recommend)
+            lang_on_off(app, app.config.home_more_recommend).to_string(),
         ),
-        lang_text(app, "退出登录", "Logout").to_string(),
-        "about".to_string(),
+        (
+            lang_text(app, "退出登录", "Logout"),
+            "".to_string(),
+        ),
+        (
+            lang_text(app, "关于", "About"),
+            "".to_string(),
+        ),
     ];
 
-    for (idx, text) in items.iter().enumerate() {
-        let style = if idx == app.settings_selected {
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(app.theme.color_text())
-        };
-        f.render_widget(
-            Paragraph::new(Line::styled(format!("  {}", text), style)),
-            Rect {
-                x: rows[1].x,
-                y: rows[1].y + idx as u16,
-                width: rows[1].width,
-                height: 1,
-            },
-        );
-    }
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.settings_selected;
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
 
-    f.render_widget(Paragraph::new(""), rows[2]);
+    f.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
 }
 
 fn render_acoustid_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
@@ -484,6 +528,11 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
         .borders(Borders::ALL)
         .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
         .title(lang_text(app, " 播放设置 ", " Playback Settings "))
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
         .style(
             Style::default()
                 .fg(app.theme.color_subtext())
@@ -504,7 +553,10 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
             Constraint::Length(1),
         ])
         .split(inner);
-    f.render_widget(Paragraph::new(""), rows[0]);
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
 
     let bar_number_label = match app.config.bar_number {
         crate::tmplayer::data::config::BarNumber::Auto => lang_text(app, "自动", "Auto"),
@@ -520,110 +572,129 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
         crate::tmplayer::data::config::BarChannels::Stereo => "Stereo",
     };
 
-    let items = vec![
-        format!(
-            "{}: {}",
+    let raw_items = vec![
+        (
             lang_text(app, "可视化", "Visualization"),
             match app.config.visualize {
-                crate::tmplayer::data::config::VisualizeMode::Off => lang_text(app, "关闭", "Off"),
-                crate::tmplayer::data::config::VisualizeMode::Bars =>
-                    lang_text(app, "柱状频谱", "Bars"),
+                crate::tmplayer::data::config::VisualizeMode::Off => {
+                    lang_text(app, "关闭", "Off").to_string()
+                }
+                crate::tmplayer::data::config::VisualizeMode::Bars => {
+                    lang_text(app, "柱状频谱", "Bars").to_string()
+                }
                 crate::tmplayer::data::config::VisualizeMode::Oscilloscope => {
-                    lang_text(app, "示波波形", "Oscilloscope")
+                    lang_text(app, "示波波形", "Oscilloscope").to_string()
                 }
                 crate::tmplayer::data::config::VisualizeMode::Circle => {
-                    lang_text(app, "环形频谱", "Circle Spectrum")
+                    lang_text(app, "环形频谱", "Circle Spectrum").to_string()
                 }
                 crate::tmplayer::data::config::VisualizeMode::Particles => {
-                    lang_text(app, "电光粒子", "Particle Wave")
+                    lang_text(app, "电光粒子", "Particle Wave").to_string()
                 }
                 crate::tmplayer::data::config::VisualizeMode::Mirror => {
-                    lang_text(app, "双向镜像", "Symmetric Mirror")
+                    lang_text(app, "双向镜像", "Symmetric Mirror").to_string()
                 }
-            }
+            },
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "超级流畅", "Super Smooth"),
-            lang_on_off(app, app.config.super_smooth_bar)
+            lang_on_off(app, app.config.super_smooth_bar).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "频谱间隔", "Bars Gap"),
-            lang_on_off(app, app.config.bars_gap)
+            lang_on_off(app, app.config.bars_gap).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "频谱数", "Bars Count"),
-            bar_number_label
+            bar_number_label.to_string(),
         ),
-        format!("{}: {}", lang_text(app, "声道", "Channels"), channels_label),
-        format!(
-            "{}: {}",
+        (
+            lang_text(app, "声道", "Channels"),
+            channels_label.to_string(),
+        ),
+        (
             lang_text(app, "封面边框", "Cover Border"),
-            lang_on_off(app, app.config.album_border)
+            lang_on_off(app, app.config.album_border).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "页面歌词", "Page Lyrics"),
-            lang_on_off(app, app.config.page_lyrics)
+            lang_on_off(app, app.config.page_lyrics).to_string(),
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "音质", "Audio Quality"),
             match app.config.audio_quality {
-                crate::tmplayer::data::config::AudioQuality::Standard =>
-                    lang_text(app, "标准", "Standard"),
-                crate::tmplayer::data::config::AudioQuality::Higher =>
-                    lang_text(app, "较高", "Higher"),
-                crate::tmplayer::data::config::AudioQuality::Exhigh =>
-                    lang_text(app, "极高", "Exhigh"),
-                crate::tmplayer::data::config::AudioQuality::Lossless =>
-                    lang_text(app, "无损", "Lossless"),
-                crate::tmplayer::data::config::AudioQuality::Hires => "Hi-Res",
+                crate::tmplayer::data::config::AudioQuality::Standard => {
+                    lang_text(app, "标准", "Standard").to_string()
+                }
+                crate::tmplayer::data::config::AudioQuality::Higher => {
+                    lang_text(app, "较高", "Higher").to_string()
+                }
+                crate::tmplayer::data::config::AudioQuality::Exhigh => {
+                    lang_text(app, "极高", "Exhigh").to_string()
+                }
+                crate::tmplayer::data::config::AudioQuality::Lossless => {
+                    lang_text(app, "无损", "Lossless").to_string()
+                }
+                crate::tmplayer::data::config::AudioQuality::Hires => "Hi-Res".to_string(),
                 crate::tmplayer::data::config::AudioQuality::Jyeffect => {
-                    lang_text(app, "高清环绕声", "JYEffect")
+                    lang_text(app, "高清环绕声", "JYEffect").to_string()
                 }
                 crate::tmplayer::data::config::AudioQuality::Sky => {
-                    lang_text(app, "沉浸环绕声", "Sky")
+                    lang_text(app, "沉浸环绕声", "Sky").to_string()
                 }
                 crate::tmplayer::data::config::AudioQuality::Dolby => {
-                    lang_text(app, "杜比全景声", "Dolby")
+                    lang_text(app, "杜比全景声", "Dolby").to_string()
                 }
                 crate::tmplayer::data::config::AudioQuality::Jymaster => {
-                    lang_text(app, "超清母带", "JYMaster")
+                    lang_text(app, "超清母带", "JYMaster").to_string()
                 }
-            }
+            },
         ),
-        format!(
-            "{}: {}",
+        (
             lang_text(app, "播放记忆", "Playback Memory"),
-            lang_on_off(app, app.config.playback_memory)
+            lang_on_off(app, app.config.playback_memory).to_string(),
+        ),
+        (
+            lang_text(app, "个人中心透明", "Personal Center Transparent"),
+            lang_on_off(app, app.config.transparent_sidebar).to_string(),
         ),
     ];
 
-    for (idx, text) in items.iter().enumerate() {
-        let style = if idx == 0 && !crate::tmplayer::audio::cava::is_available() {
-            Style::default().fg(app.theme.color_subtext())
-        } else if idx == app.bar_settings_selected {
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(app.theme.color_text())
-        };
-        f.render_widget(
-            Paragraph::new(Line::styled(format!("  {}", text), style)),
-            Rect {
-                x: rows[1].x,
-                y: rows[1].y + idx as u16,
-                width: rows[1].width,
-                height: 1,
-            },
-        );
-    }
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.bar_settings_selected;
+            let disabled = idx == 0 && !crate::tmplayer::audio::cava::is_available();
+            let prefix = if selected { "› " } else { "  " };
+            let style = if disabled {
+                Style::default()
+                    .fg(app.theme.color_subtext())
+                    .bg(app.theme.color_surface())
+            } else if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
 
-    f.render_widget(Paragraph::new(""), rows[2]);
+    f.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
 }
 
 fn render_local_audio_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
@@ -762,7 +833,12 @@ fn render_about_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
-        .title(" about ")
+        .title(lang_text(app, " 关于 ", " About "))
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
         .style(
             Style::default()
                 .fg(app.theme.color_subtext())
@@ -1006,6 +1082,11 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
         .borders(Borders::ALL)
         .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
         .title(lang_text(app, " 按键绑定 ", " Keybinds "))
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
         .style(
             Style::default()
                 .fg(app.theme.color_subtext())
@@ -1026,7 +1107,10 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
             Constraint::Length(1),
         ])
         .split(inner);
-    f.render_widget(Paragraph::new(""), rows[0]);
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
 
     let items = [
         (
@@ -1094,32 +1178,45 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
         (selected + 1 - visible_rows).min(max_scroll)
     };
 
-    for (idx, (label, key)) in items.iter().enumerate().skip(scroll).take(visible_rows) {
-        let style = if idx == selected {
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(app.theme.color_text())
-        };
-        f.render_widget(
-            Paragraph::new(Line::styled(format!("  {}: {}", label, key), style)),
-            Rect {
-                x: rows[1].x,
-                y: rows[1].y + (idx - scroll) as u16,
-                width: rows[1].width,
-                height: 1,
-            },
-        );
-    }
+    let lines: Vec<Line> = items
+        .iter()
+        .enumerate()
+        .skip(scroll)
+        .take(visible_rows)
+        .map(|(idx, (label, key))| {
+            let is_sel = idx == selected;
+            let prefix = if is_sel { "› " } else { "  " };
+            let style = if is_sel {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, label, key, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
+
+    f.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
 
     f.render_widget(
         Paragraph::new(lang_text(
             app,
-            "Up/Down 浏览  Esc 关闭（仅查看）",
-            "Up/Down browse  Esc close (view only, no rebinding)",
+            " Up/Down 浏览  Esc 返回 ",
+            " Up/Down browse  Esc back ",
         ))
-        .style(Style::default().fg(app.theme.color_subtext())),
+        .style(
+            Style::default()
+                .fg(app.theme.color_subtext())
+                .bg(app.theme.color_surface()),
+        ),
         rows[2],
     );
 }
@@ -1133,7 +1230,12 @@ fn render_eq_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
-        .title(lang_text(app, "均衡器", "Equalizer"))
+        .title(lang_text(app, " 均衡器 ", " Equalizer "))
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
         .style(
             Style::default()
                 .fg(app.theme.color_subtext())
@@ -1394,8 +1496,138 @@ fn render_eq_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     );
 }
 
+fn get_volume_popover_rect(layout_full: Rect, left_rect: Rect, btn_rect: Rect) -> (Rect, bool) {
+    let popup_w: u16 = 21;
+    let popup_h: u16 = 1;
+
+    let center_x = if btn_rect.width > 0 {
+        btn_rect.x + btn_rect.width / 2
+    } else {
+        left_rect.x + left_rect.width / 2
+    };
+
+    let min_x = left_rect.x.saturating_add(1);
+    let max_x = (left_rect.x + left_rect.width).saturating_sub(popup_w + 1);
+    let popup_x = center_x.saturating_sub(popup_w / 2).clamp(min_x, max_x.max(min_x));
+
+    // Place popover below the button by default; fallback to above if not enough space at bottom
+    let below_y = btn_rect.y.saturating_add(btn_rect.height.max(1));
+    let max_allowed_y = (left_rect.y + left_rect.height).saturating_sub(popup_h + 1);
+    let (popup_y, arrow_down) = if below_y <= max_allowed_y {
+        (below_y, false)
+    } else if btn_rect.y >= popup_h {
+        (btn_rect.y.saturating_sub(popup_h), true)
+    } else {
+        (below_y.min(layout_full.height.saturating_sub(popup_h)), false)
+    };
+
+    (
+        Rect {
+            x: popup_x,
+            y: popup_y,
+            width: popup_w.min(layout_full.width),
+            height: popup_h,
+        },
+        arrow_down,
+    )
+}
+
+fn render_volume_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(33), Constraint::Percentage(67)])
+        .split(size);
+    let info_l = info_panel::layout(cols[0]);
+    let btn_rect = control_buttons::volume_button_rect(info_l.controls, app);
+    let (area, _) = get_volume_popover_rect(size, cols[0], btn_rect);
+
+    if area.width < 10 || area.height < 1 {
+        return;
+    }
+
+    f.render_widget(ratatui::widgets::Clear, area);
+
+    let vol = app.player.volume.clamp(0.0, 1.0);
+    let vol_pct = (vol * 100.0).round() as i32;
+    let is_muted = vol_pct == 0;
+    let vol_icon = if is_muted {
+        "󰝟"
+    } else if vol_pct < 33 {
+        "󰕿"
+    } else if vol_pct < 66 {
+        "󰖀"
+    } else {
+        "󰕾"
+    };
+
+    let bg = app.theme.color_surface();
+    let accent_style = Style::default().fg(app.theme.color_accent()).add_modifier(Modifier::BOLD).bg(bg);
+    let subtext_style = Style::default().fg(app.theme.color_subtext()).bg(bg);
+    let text_style = Style::default().fg(app.theme.color_text()).add_modifier(Modifier::BOLD).bg(bg);
+
+    let filled = (vol * 10.0).round() as usize;
+    let filled_s = "█".repeat(filled.min(10));
+    let empty_s = "░".repeat(10usize.saturating_sub(filled.min(10)));
+
+    let line = Line::from(vec![
+        Span::styled("[ ", subtext_style),
+        Span::styled(
+            vol_icon,
+            if is_muted {
+                subtext_style
+            } else {
+                accent_style
+            },
+        ),
+        Span::styled(" ", Style::default().bg(bg)),
+        Span::styled(filled_s, accent_style),
+        Span::styled(empty_s, subtext_style),
+        Span::styled(" ", Style::default().bg(bg)),
+        Span::styled(format!("{vol_pct:>3}%"), text_style),
+        Span::styled(" ]", subtext_style),
+    ]);
+
+    f.render_widget(Paragraph::new(line).style(Style::default().bg(bg)), area);
+}
+
 pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option<Action> {
-    // Eq modal consumes clicks first
+    // Volume modal popover consumes clicks first
+    if app.overlay == Overlay::VolumeModal {
+        let (area, _) = get_volume_popover_rect(layout.full, layout.left, layout.info_volume);
+
+        if !contains(area, col, row) {
+            return Some(Action::CloseOverlay);
+        }
+
+        let x = area.x;
+
+        // Left bracket: 0%
+        if col <= x + 1 {
+            return Some(Action::SetVolume(0.0));
+        }
+
+        // Icon area: toggle mute
+        if col <= x + 3 {
+            return Some(Action::ToggleMute);
+        }
+
+        // 10-block slider
+        if col >= x + 4 && col <= x + 13 {
+            let block = col - (x + 4);
+            let ratio = ((block as f32 + 0.5) / 10.0).clamp(0.0, 1.0);
+            return Some(Action::SetVolume(ratio));
+        }
+
+        // Right bracket: 100%
+        if col >= x + 19 {
+            return Some(Action::SetVolume(1.0));
+        }
+
+        // Percentage text: toggle mute
+        return Some(Action::ToggleMute);
+    }
+
+    // Eq modal consumes clicks second
     if app.overlay == Overlay::EqModal {
         let area = centered_rect(layout.full, 44, 31);
         let inner = area.inner(ratatui::layout::Margin {
@@ -1445,9 +1677,7 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
                     }
                 }
 
-                let Some(band) = band else {
-                    return None;
-                };
+                let band = band?;
 
                 // fixed height mapping: prefer 25 rows (12..0..-12)
                 let want_h: u16 = 25;
@@ -1492,7 +1722,7 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
     }
 
     if contains(layout.info_volume, col, row) {
-        return Some(Action::SetVolume(ratio_in_bar(layout.info_volume, col)));
+        return Some(Action::OpenVolumeModal);
     }
 
     if contains(layout.info_progress, col, row) {
@@ -1514,6 +1744,7 @@ fn contains(r: Rect, col: u16, row: u16) -> bool {
     col >= r.x && col < r.x + r.width && row >= r.y && row < r.y + r.height
 }
 
+#[allow(dead_code)]
 fn ratio_in_bar(r: Rect, col: u16) -> f32 {
     if r.width <= 2 {
         return 0.0;
@@ -1532,7 +1763,7 @@ fn ratio_in_track(r: Rect, col: u16) -> f32 {
     (x / denom).clamp(0.0, 1.0)
 }
 
-fn lang_text<'a>(app: &AppState, zh: &'a str, en: &'a str) -> &'a str {
+pub(crate) fn lang_text<'a>(app: &AppState, zh: &'a str, en: &'a str) -> &'a str {
     match app.language {
         crate::data::config::Language::Zh => zh,
         crate::data::config::Language::En => en,
@@ -1557,3 +1788,85 @@ fn lang_on_off(app: &AppState, enabled: bool) -> &'static str {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_setting_line_alignment() {
+        let line = format_setting_line("› ", "主题", "catppuccin_mocha", 66);
+        assert!(line.starts_with(" › 主题"));
+        assert!(line.ends_with("catppuccin_mocha "));
+        let width = UnicodeWidthStr::width(line.as_str());
+        assert_eq!(width, 66);
+    }
+
+    #[test]
+    fn test_volume_modal_hit_test() {
+        let mut app = AppState::new(
+            crate::tmplayer::data::config::Config::default(),
+            crate::tmplayer::ui::theme::Theme::default(),
+            crate::data::config::Language::Zh,
+        );
+        app.player.volume = 0.5;
+
+        let mut layout = UiLayout::default();
+        layout.full = Rect { x: 0, y: 0, width: 100, height: 30 };
+        layout.left = Rect { x: 0, y: 0, width: 33, height: 30 };
+        layout.info_volume = Rect { x: 15, y: 20, width: 8, height: 1 };
+
+        // 1. In normal mode, clicking info_volume opens volume modal
+        app.overlay = Overlay::None;
+        let act = hit_test(&layout, &app, 16, 20);
+        assert_eq!(act, Some(Action::OpenVolumeModal));
+
+        // 2. In VolumeModal mode, clicking outside the modal closes it
+        app.overlay = Overlay::VolumeModal;
+        let act_outside = hit_test(&layout, &app, 2, 2);
+        assert_eq!(act_outside, Some(Action::CloseOverlay));
+
+        // Capsule is at x = 9, y = 21, width = 21, height = 1
+        // Col 10 (x + 1): 0%
+        let act_zero = hit_test(&layout, &app, 10, 21);
+        assert_eq!(act_zero, Some(Action::SetVolume(0.0)));
+
+        // Col 11 (x + 2): speaker icon click toggles mute
+        let act_mute = hit_test(&layout, &app, 11, 21);
+        assert_eq!(act_mute, Some(Action::ToggleMute));
+
+        // Col 28 (x + 19): 100%
+        let act_full = hit_test(&layout, &app, 28, 21);
+        assert_eq!(act_full, Some(Action::SetVolume(1.0)));
+
+        // Col 18 (x + 9): block 5 -> ~55%
+        let act_bar = hit_test(&layout, &app, 18, 21);
+        if let Some(Action::SetVolume(v)) = act_bar {
+            assert!((v - 0.55).abs() < 0.05);
+        } else {
+            panic!("Expected SetVolume action, got {:?}", act_bar);
+        }
+    }
+
+    #[test]
+    fn test_volume_modal_input_mapping() {
+        use crate::tmplayer::utils::input::map_key;
+        let config = crate::tmplayer::data::config::Config::default();
+
+        let left = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Left);
+        assert_eq!(map_key(left, Overlay::VolumeModal, &config), Action::VolumeDown);
+
+        let right = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Right);
+        assert_eq!(map_key(right, Overlay::VolumeModal, &config), Action::VolumeUp);
+
+        let space = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Char(' '));
+        assert_eq!(map_key(space, Overlay::VolumeModal, &config), Action::ToggleMute);
+
+        let esc = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Esc);
+        assert_eq!(map_key(esc, Overlay::VolumeModal, &config), Action::CloseOverlay);
+
+        let v_key = crossterm::event::KeyEvent::from(crossterm::event::KeyCode::Char('v'));
+        assert_eq!(map_key(v_key, Overlay::None, &config), Action::OpenVolumeModal);
+    }
+}
+

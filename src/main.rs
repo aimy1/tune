@@ -162,6 +162,7 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    install_panic_hook();
     ring::default_provider().install_default().unwrap();
     let config = Config::load_or_default()?;
     let theme = ThemeLoader::load(&config.theme).unwrap_or_default();
@@ -171,6 +172,16 @@ async fn main() -> Result<()> {
     let run_result = run_app(&mut terminal, &mut app).await;
     restore_terminal(&mut terminal)?;
     run_result
+}
+
+fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let _ = disable_raw_mode();
+        let mut stdout = io::stdout();
+        let _ = execute!(stdout, DisableMouseCapture, LeaveAlternateScreen);
+        default_hook(panic_info);
+    }));
 }
 
 fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {

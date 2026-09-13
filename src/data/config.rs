@@ -40,7 +40,7 @@ impl GraphicsProtocol {
             GraphicsProtocol::Off => 0,
             GraphicsProtocol::Halfblocks => 1,
         };
-        let next = (current as i32 + delta).rem_euclid(Self::ALL.len() as i32) as usize;
+        let next = (current + delta).rem_euclid(Self::ALL.len() as i32) as usize;
         Self::ALL[next]
     }
 

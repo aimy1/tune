@@ -17,25 +17,32 @@ mod imp {
     }
 
     pub struct MprisClient {
-        finder: PlayerFinder,
+        finder: Option<PlayerFinder>,
         last_track_id: Option<TrackID>,
     }
 
     impl MprisClient {
         pub fn new() -> Self {
+            let finder = match PlayerFinder::new() {
+                Ok(finder) => Some(finder),
+                Err(e) => {
+                    log::warn!("mpris finder init failed (D-Bus may be unavailable): {e}");
+                    None
+                }
+            };
             Self {
-                finder: PlayerFinder::new().unwrap_or_else(|e| {
-                    log::warn!("mpris finder init failed: {e}");
-                    PlayerFinder::new().unwrap()
-                }),
+                finder,
                 last_track_id: None,
             }
         }
 
+        fn active_player(&self) -> Option<mpris::Player> {
+            self.finder.as_ref()?.find_active().ok()
+        }
+
         pub fn poll_snapshot(&mut self) -> Result<Option<MprisSnapshot>> {
-            let player = match self.finder.find_active() {
-                Ok(p) => p,
-                Err(_) => return Ok(None),
+            let Some(player) = self.active_player() else {
+                return Ok(None);
             };
 
             let status = player
@@ -85,35 +92,35 @@ mod imp {
         }
 
         pub fn toggle_play_pause(&mut self) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 let _ = p.play_pause();
             }
             Ok(())
         }
 
         pub fn pause(&mut self) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 let _ = p.pause();
             }
             Ok(())
         }
 
         pub fn next(&mut self) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 let _ = p.next();
             }
             Ok(())
         }
 
         pub fn prev(&mut self) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 let _ = p.previous();
             }
             Ok(())
         }
 
         pub fn seek_to(&mut self, pos: Duration) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 if let Some(id) = self.last_track_id.clone() {
                     let _ = p.set_position(id, &pos);
                 } else {
@@ -128,7 +135,7 @@ mod imp {
         }
 
         pub fn set_volume_delta(&mut self, delta: f32) -> Result<()> {
-            if let Ok(p) = self.finder.find_active() {
+            if let Some(p) = self.active_player() {
                 let v = p.get_volume().unwrap_or(0.0) as f32;
                 let nv = (v + delta).clamp(0.0, 1.0);
                 let _ = p.set_volume(nv as f64);

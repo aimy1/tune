@@ -114,12 +114,8 @@ pub fn read_cover_from_folder(dir: &Path) -> Option<(Vec<u8>, u64)> {
 }
 
 fn read_cover_for_audio(audio_path: &Path) -> Option<(Vec<u8>, u64)> {
-    let Some(folder) = audio_path.parent() else {
-        return None;
-    };
-    let Some(stem) = audio_path.file_stem().and_then(|s| s.to_str()) else {
-        return None;
-    };
+    let folder = audio_path.parent()?;
+    let stem = audio_path.file_stem()?.to_str()?;
     let exts = ["jpg", "jpeg", "png"];
     let cover_dir = folder.join("cover");
     for ext in exts {

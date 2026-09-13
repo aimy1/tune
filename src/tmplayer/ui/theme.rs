@@ -87,6 +87,25 @@ impl Theme {
     }
 }
 
+impl Default for Theme {
+    fn default() -> Self {
+        Self {
+            name: ThemeName::System,
+            capability: ColorCapability::TrueColor,
+            palette: ThemePalette {
+                text: (242, 244, 248),
+                subtext: (148, 156, 187),
+                base: (17, 17, 27),
+                surface: (24, 24, 37),
+                buff: (42, 43, 61),
+                accent: (51, 204, 255),
+                accent2: (0, 255, 153),
+                accent3: (203, 166, 247),
+            },
+        }
+    }
+}
+
 pub fn detect_color_capability() -> ColorCapability {
     let colorterm = std::env::var("COLORTERM")
         .unwrap_or_default()

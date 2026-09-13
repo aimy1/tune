@@ -332,7 +332,9 @@ impl HomeTile {
         cover_url: Option<String>,
     ) -> Self {
         let mut cover = CoverFetchState::default();
-        cover_url.map(|x| cover.load(api.clone(), x));
+        if let Some(x) = cover_url {
+            cover.load(api.clone(), x);
+        }
         Self {
             id,
             title,
@@ -1182,7 +1184,9 @@ impl AuthorTile {
         kind: AuthorTileKind,
     ) -> Self {
         let mut cover = CoverFetchState::default();
-        cover_url.map(|x| cover.load(api.clone(), x));
+        if let Some(x) = cover_url {
+            cover.load(api.clone(), x);
+        }
         Self {
             kind,
             title,
@@ -1573,7 +1577,7 @@ async fn loop_cover_fetch(
         let _ = tx.send(CoverFetchResult {
             song_id: req.song_id,
             url: req.url,
-            bytes: bytes,
+            bytes,
         });
     }
 }
@@ -1781,7 +1785,7 @@ impl App {
             graphics_picker: Picker::halfblocks(),
         };
 
-        if let Ok(_) = Picker::from_query_stdio() {
+        if Picker::from_query_stdio().is_ok() {
             // Don't use queried picker, this cause image layouted improperly on konsole.
             // It's ok to not set this if we just use Halfblocks.
 
@@ -3104,7 +3108,7 @@ impl App {
                     Ok(url) => {
                         let (progress_tx, progress_rx) = watch::channel::<(u64, u64)>((0, 0));
                         match StreamingReader::new(
-                            &self.api.http_client(),
+                            self.api.http_client(),
                             &url,
                             cache_path.clone(),
                             self.api.session_cookie(),
@@ -3617,7 +3621,9 @@ impl App {
             )
             .to_string();
         self.playlist.set_tracks(tracks);
-        section_cover.map(|x| self.playlist.cover.load(self.api.clone(), x));
+        if let Some(x) = section_cover {
+            self.playlist.cover.load(self.api.clone(), x);
+        }
         self.page = Page::Playlist;
     }
 
@@ -5834,7 +5840,9 @@ impl App {
         self.playlist.artist = artist;
         self.playlist.description = description;
         self.playlist.set_tracks(tracks);
-        cover_url.map(|x| self.playlist.cover.load(self.api.clone(), x));
+        if let Some(x) = cover_url {
+            self.playlist.cover.load(self.api.clone(), x);
+        }
         Ok(())
     }
 
@@ -5876,7 +5884,9 @@ impl App {
             )
             .to_string();
         self.playlist.set_tracks(tracks);
-        cover_url.map(|x| self.playlist.cover.load(self.api.clone(), x));
+        if let Some(x) = cover_url {
+            self.playlist.cover.load(self.api.clone(), x);
+        }
         Ok(())
     }
 
@@ -5938,7 +5948,9 @@ impl App {
         self.playlist.artist = artist;
         self.playlist.description = description;
         self.playlist.set_tracks(tracks);
-        cover_url.map(|x| self.playlist.cover.load(self.api.clone(), x));
+        if let Some(x) = cover_url {
+            self.playlist.cover.load(self.api.clone(), x);
+        }
         Ok(())
     }
 
@@ -6156,7 +6168,9 @@ impl App {
             ),
         };
         self.author.description = description;
-        cover_url.map(|x| self.author.cover.load(self.api.clone(), x));
+        if let Some(x) = cover_url {
+            self.author.cover.load(self.api.clone(), x);
+        }
         self.author.set_tiles(tiles);
         self.author.hot_songs = hot_songs;
         self.author.albums = albums;

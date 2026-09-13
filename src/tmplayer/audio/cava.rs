@@ -249,11 +249,7 @@ fn parse_frames_ascii(s: &str, bars: usize) -> Vec<Vec<f32>> {
     let mut out: Vec<Vec<f32>> = Vec::new();
     let mut idx = 0usize;
     while idx + bars <= vals.len() {
-        let mut frame = vec![0.0f32; bars];
-        for i in 0..bars {
-            frame[i] = vals[idx + i];
-        }
-        out.push(frame);
+        out.push(vals[idx..idx + bars].to_vec());
         idx += bars;
     }
 
@@ -266,5 +262,6 @@ fn temp_cfg_path() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    format!("/tmp/tmplayer-cava-{pid}-{ts}.conf")
+    let path = std::env::temp_dir().join(format!("tmplayer-cava-{pid}-{ts}.conf"));
+    path.to_string_lossy().to_string()
 }

@@ -386,6 +386,7 @@ impl ApiState {
 
         let merged = response.cookie.join("; ");
         self.cookie = Some(merged.clone());
-        self.client.set_cookie(merged);
+        self.client.set_cookie(merged.clone());
+        let _ = crate::data::session::save_cookie(&merged);
     }
 }

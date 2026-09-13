@@ -57,9 +57,9 @@ pub fn advance_phases(phases: &mut [f32; BINS], dt_sec: f32) {
         return;
     }
     let dt_sec = dt_sec.clamp(1.0 / 240.0, 1.0 / 5.0);
-    for k in 0..BINS {
+    for (k, phase) in phases.iter_mut().enumerate() {
         let f = freq_for_bin(k);
-        phases[k] = wrap_tau(phases[k] + std::f32::consts::TAU * f * dt_sec);
+        *phase = wrap_tau(*phase + std::f32::consts::TAU * f * dt_sec);
     }
 }
 

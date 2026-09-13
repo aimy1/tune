@@ -63,7 +63,7 @@ impl ThemeLoader {
 
 fn parse_hex(s: &str) -> (u8, u8, u8) {
     let s = s.trim().trim_start_matches('#');
-    if s.len() != 6 {
+    if !s.is_ascii() || s.len() != 6 {
         return (255, 255, 255);
     }
 

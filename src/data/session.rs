@@ -2,6 +2,8 @@ use crate::data::assets;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -40,6 +42,10 @@ pub fn save_cookie(cookie: &str) -> Result<()> {
 
     let raw = toml::to_string_pretty(&record).unwrap_or_default();
     fs::write(&path, raw).with_context(|| format!("write {}", path.display()))?;
+    #[cfg(unix)]
+    {
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+    }
     Ok(())
 }
 

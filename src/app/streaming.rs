@@ -5,7 +5,7 @@
 use anyhow::{Context, Result, bail};
 use reqwest::Client;
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -104,7 +104,7 @@ impl StreamingReader {
         let reader = Self {
             state: state_clone,
             file,
-            tmp_path: tmp_path,
+            tmp_path,
             writer: hnd.abort_handle(),
         };
 
@@ -126,9 +126,9 @@ impl StreamingReader {
             if done == 2 {
                 let err = self.state.error.lock().unwrap();
                 if let Some(msg) = err.as_ref() {
-                    return Err(Error::new(ErrorKind::Other, msg.clone()));
+                    return Err(Error::other(msg.clone()));
                 }
-                return Err(Error::new(ErrorKind::Other, "download failed"));
+                return Err(Error::other("download failed"));
             }
             if pos < downloaded {
                 // Data at position is available
@@ -176,10 +176,7 @@ impl Seek for StreamingReader {
                         break total.wrapping_add_signed(p);
                     }
                     if done == 2 {
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "download failed",
-                        ));
+                        return Err(std::io::Error::other("download failed"));
                     }
 
                     // Efficiently wait for download to complete
@@ -209,7 +206,7 @@ impl Seek for StreamingReader {
                 break;
             }
             if done == 2 {
-                return Err(Error::new(ErrorKind::Other, "download failed"));
+                return Err(Error::other("download failed"));
             }
             if new_pos <= downloaded {
                 break;
@@ -256,7 +253,6 @@ async fn download_streaming(
     let mut file = {
         let _guard = state.file_lock.lock().unwrap();
         OpenOptions::new()
-            .write(true)
             .append(true)
             .open(&tmp_path)
             .context("open streaming temp file for write")?

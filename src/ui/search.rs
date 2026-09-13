@@ -67,8 +67,8 @@ fn draw_result_panel(frame: &mut Frame, app: &mut App, area: Rect) {
         Block::default()
             .borders(Borders::TOP)
             .title(match app.config.language {
-                Language::Zh => " 搜索结果 ",
-                Language::En => " Search Results ",
+                Language::Zh => " 󰍉 搜索结果 ",
+                Language::En => " 󰍉 Search Results ",
             })
             .border_style(border_style),
         area,
@@ -162,7 +162,7 @@ fn render_search_row(
     let is_now_playing = app.is_now_playing_song(item.song_id.as_deref());
     let zebra_bg = if app.config.transparent_background {
         None
-    } else if item_idx % 2 == 0 {
+    } else if item_idx.is_multiple_of(2) {
         Some(app.theme.color_base())
     } else {
         Some(app.theme.color_surface())

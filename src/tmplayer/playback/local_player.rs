@@ -338,8 +338,8 @@ fn detect_folder_kind(folder: &Path) -> (LocalFolderKind, Vec<PathBuf>) {
 }
 
 pub struct LocalPlayer {
-    _device_sink: MixerDeviceSink,
-    player: Player,
+    _device_sink: Option<MixerDeviceSink>,
+    player: Option<Player>,
 
     current_path: Option<PathBuf>,
     duration: Option<Duration>,
@@ -365,10 +365,17 @@ pub struct LocalPlayer {
 
 impl LocalPlayer {
     pub fn new() -> Self {
-        let mut device_sink =
-            rodio::DeviceSinkBuilder::open_default_sink().expect("no output device");
-        device_sink.log_on_drop(false);
-        let player = Player::connect_new(device_sink.mixer());
+        let (device_sink, player) = match rodio::DeviceSinkBuilder::open_default_sink() {
+            Ok(mut ds) => {
+                ds.log_on_drop(false);
+                let p = Player::connect_new(ds.mixer());
+                (Some(ds), Some(p))
+            }
+            Err(e) => {
+                log::warn!("no audio output device for local player: {e}");
+                (None, None)
+            }
+        };
         let eq_params = Arc::new(EqParams::new());
         Self {
             _device_sink: device_sink,
@@ -388,6 +395,18 @@ impl LocalPlayer {
             meta_order: VecDeque::new(),
             meta_cap: 64,
         }
+    }
+
+    fn ensure_device_sink(&mut self) -> Result<()> {
+        if self.player.is_none() {
+            let mut ds = rodio::DeviceSinkBuilder::open_default_sink()
+                .map_err(|e| anyhow!("no audio output device: {e}"))?;
+            ds.log_on_drop(false);
+            let p = Player::connect_new(ds.mixer());
+            self._device_sink = Some(ds);
+            self.player = Some(p);
+        }
+        Ok(())
     }
 
     fn cached_metadata(&mut self, path: &Path) -> TrackMetadata {
@@ -587,8 +606,11 @@ impl LocalPlayer {
     }
 
     pub fn play_file(&mut self, path: &Path) -> Result<TrackMetadata> {
-        // stop current (avoid blocking rebuilds; keep the sink and just clear sources)
-        self.player.clear();
+        self.ensure_device_sink()?;
+        if let Some(player) = self.player.as_mut() {
+            // stop current (avoid blocking rebuilds; keep the sink and just clear sources)
+            player.clear();
+        }
 
         // metadata
         let meta = self.cached_metadata(path);
@@ -601,7 +623,9 @@ impl LocalPlayer {
         self.started_at = Some(Instant::now());
 
         // apply volume
-        self.player.set_volume(self.volume);
+        if let Some(player) = self.player.as_mut() {
+            player.set_volume(self.volume);
+        }
 
         self.viz_samples.clear();
         let src = SymphoniaSource::open(path, Duration::from_secs(0), Some(meta.duration))?;
@@ -609,8 +633,10 @@ impl LocalPlayer {
         self.eq_params.set_from(self.eq);
         let eqd = EqSource::new(src, Arc::clone(&self.eq_params));
         let tapped = TapSource::new(eqd, Arc::clone(&self.viz_samples));
-        self.player.append(tapped);
-        self.player.play();
+        if let Some(player) = self.player.as_mut() {
+            player.append(tapped);
+            player.play();
+        }
         Ok(meta)
     }
 
@@ -623,14 +649,20 @@ impl LocalPlayer {
             self.paused_acc = pos.saturating_sub(self.base_seek);
             self.started_at = None;
         }
-        self.player.pause();
+        if let Some(player) = self.player.as_mut() {
+            player.pause();
+        }
         Ok(())
     }
 
     pub fn toggle_play_pause(&mut self) -> Result<()> {
-        if self.player.is_paused() {
-            self.player.play();
-            self.started_at = Some(Instant::now());
+        let is_paused = self.player.as_ref().map(|p| p.is_paused()).unwrap_or(true);
+        if is_paused {
+            let _ = self.ensure_device_sink();
+            if let Some(player) = self.player.as_mut() {
+                player.play();
+                self.started_at = Some(Instant::now());
+            }
         } else {
             self.pause()?;
         }
@@ -639,7 +671,9 @@ impl LocalPlayer {
 
     pub fn set_volume(&mut self, v: f32) {
         self.volume = v.clamp(0.0, 1.0);
-        self.player.set_volume(self.volume);
+        if let Some(player) = self.player.as_mut() {
+            player.set_volume(self.volume);
+        }
     }
 
     pub fn volume(&self) -> f32 {
@@ -650,11 +684,14 @@ impl LocalPlayer {
         if self.current_path.is_none() {
             return PlaybackState::Stopped;
         }
+        let Some(player) = self.player.as_ref() else {
+            return PlaybackState::Stopped;
+        };
         // When the sink has no more sources (track finished), treat as stopped.
-        if self.player.empty() {
+        if player.empty() {
             return PlaybackState::Stopped;
         }
-        if self.player.is_paused() {
+        if player.is_paused() {
             PlaybackState::Paused
         } else {
             PlaybackState::Playing
@@ -662,9 +699,7 @@ impl LocalPlayer {
     }
 
     pub fn position(&self) -> Option<Duration> {
-        if self.current_path.is_none() {
-            return None;
-        }
+        self.current_path.as_ref()?;
         let mut pos = if let Some(start) = self.started_at {
             self.base_seek + self.paused_acc + start.elapsed()
         } else {
@@ -687,7 +722,7 @@ impl LocalPlayer {
         // Only transition once: when we were "playing" (started_at exists)
         // and the sink becomes empty OR we reached the known duration.
         if self.started_at.is_some() {
-            let mut finished = self.player.empty();
+            let mut finished = self.player.as_ref().map(|p| p.empty()).unwrap_or(true);
             if !finished {
                 if let Some(dur) = self.duration {
                     // Some formats may not flip sink.empty reliably; use duration as fallback.
@@ -726,23 +761,28 @@ impl LocalPlayer {
             return Ok(());
         };
 
-        let was_paused = self.player.is_paused();
+        let _ = self.ensure_device_sink();
+        let was_paused = self.player.as_ref().map(|p| p.is_paused()).unwrap_or(false);
 
         // Replace source without rebuilding the output sink (prevents UI stalls on some systems).
-        self.player.clear();
-        self.player.set_volume(self.volume);
+        if let Some(player) = self.player.as_mut() {
+            player.clear();
+            player.set_volume(self.volume);
+        }
 
         self.viz_samples.clear();
         let src = SymphoniaSource::open(&path, pos, self.duration)?;
         self.eq_params.set_from(self.eq);
         let eqd = EqSource::new(src, Arc::clone(&self.eq_params));
         let tapped = TapSource::new(eqd, Arc::clone(&self.viz_samples));
-        self.player.append(tapped);
+        if let Some(player) = self.player.as_mut() {
+            player.append(tapped);
 
-        if was_paused {
-            self.player.pause();
-        } else {
-            self.player.play();
+            if was_paused {
+                player.pause();
+            } else {
+                player.play();
+            }
         }
 
         self.base_seek = pos;

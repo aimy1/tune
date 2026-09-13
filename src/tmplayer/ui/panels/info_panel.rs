@@ -2,7 +2,7 @@ use crate::data::config::GraphicsProtocol;
 use crate::tmplayer::app::state::{AppState, CoverSnapshot, Overlay, PlayMode};
 use crate::tmplayer::render::cover_cache::CoverKey;
 use crate::tmplayer::ui::borders::SOLID_BORDER;
-use crate::tmplayer::ui::components::{control_buttons, progress_bar, volume_bar};
+use crate::tmplayer::ui::components::{control_buttons, progress_bar};
 use crate::tmplayer::utils::timefmt;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
@@ -21,6 +21,7 @@ pub struct InfoPanelLayout {
     pub progress: Rect,
     pub volume: Rect,
     pub controls: Rect,
+    #[allow(dead_code)]
     pub volume_label: Rect,
     pub time_line: Rect,
 }
@@ -33,21 +34,18 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
     });
 
     // Required rows in priority order (must survive resize as long as possible):
-    // 1) metadata (3 lines) 2) progress 3) volume 4) controls
+    // 1) metadata (3 lines) 2) progress 3) controls (with volume button)
     const META_H: u16 = 3;
     const PROGRESS_H: u16 = 1;
-    const VOLUME_H: u16 = 1;
     const CONTROLS_H: u16 = 1;
-    const CORE_H: u16 = META_H + PROGRESS_H + VOLUME_H + CONTROLS_H;
+    const CORE_H: u16 = META_H + PROGRESS_H + CONTROLS_H;
 
     // Secondary rows can be dropped before affecting core rows.
     let show_time_line = inner.height >= CORE_H.saturating_add(1);
-    let show_volume_label = inner.height >= CORE_H.saturating_add(2);
     let time_h = if show_time_line { 1 } else { 0 };
-    let volume_label_h = if show_volume_label { 1 } else { 0 };
 
     // Remaining height is for cover + an optional gap below cover.
-    let used_without_cover = CORE_H.saturating_add(time_h).saturating_add(volume_label_h);
+    let used_without_cover = CORE_H.saturating_add(time_h);
     let mut cover_h = inner.height.saturating_sub(used_without_cover);
     let use_cover_gap = cover_h > 1;
     if use_cover_gap {
@@ -109,22 +107,6 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
     };
     y = y.saturating_add(PROGRESS_H);
 
-    let volume = Rect {
-        x: inner.x,
-        y,
-        width: inner.width,
-        height: VOLUME_H,
-    };
-    y = y.saturating_add(VOLUME_H);
-
-    let volume_label = Rect {
-        x: inner.x,
-        y,
-        width: inner.width,
-        height: volume_label_h,
-    };
-    y = y.saturating_add(volume_label_h);
-
     let controls = Rect {
         x: inner.x,
         y,
@@ -137,9 +119,9 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
         cover,
         meta,
         progress,
-        volume,
+        volume: controls,
         controls,
-        volume_label,
+        volume_label: Rect::default(),
         time_line,
     }
 }
@@ -148,7 +130,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
     let b = Block::default()
         .borders(Borders::ALL)
         .border_set(SOLID_BORDER)
-        .title(" ")
         .style(Style::default().fg(app.theme.color_subtext()));
     f.render_widget(b, area);
 
@@ -399,18 +380,6 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
         }
 
         progress_bar::render(f, l.progress, app, pos, dur);
-        volume_bar::render(f, l.volume, app, app.player.volume);
-
-        if l.volume_label.height > 0 {
-            let v_label = format!("Vol {}%", (app.player.volume * 100.0).round() as i32);
-            f.render_widget(
-                Paragraph::new(v_label)
-                    .style(sub_style)
-                    .alignment(Alignment::Left),
-                l.volume_label,
-            );
-        }
-
         control_buttons::render(f, l.controls, app);
 
         // (Removed S/R hint)
@@ -693,3 +662,41 @@ fn mode_label(m: PlayMode, lang: crate::data::config::Language) -> &'static str 
         (PlayMode::SystemMonitor, crate::data::config::Language::En) => "System",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
+
+    #[test]
+    fn test_info_panel_border_has_no_gap() {
+        let backend = TestBackend::new(10, 4);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                let area = f.area();
+                let b = Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(SOLID_BORDER);
+                f.render_widget(b, area);
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        // Top border should be continuous: ╭────────╮
+        let top_row: String = (0..10).map(|x| buffer[(x, 0)].symbol()).collect();
+        assert_eq!(top_row, "╭────────╮");
+        assert!(!top_row.contains(' '));
+    }
+
+    #[test]
+    fn test_info_panel_volume_button_layout() {
+        let area = Rect { x: 0, y: 0, width: 40, height: 20 };
+        let l = layout(area);
+        assert_eq!(l.volume.height, 1);
+        assert!(l.volume.width > 0);
+        assert_eq!(l.volume_label.height, 0);
+    }
+}
+

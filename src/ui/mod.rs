@@ -122,12 +122,12 @@ pub fn draw_header_bar(frame: &mut Frame, app: &mut App, area: Rect) {
             crate::data::config::Language::Zh => vec![
                 (0, " 󰎆 发现 "),
                 (1, " 󰓏 歌单 "),
-                (2, " 🔍 搜索 "),
+                (2, " 󰍉 搜索 "),
             ],
             crate::data::config::Language::En => vec![
                 (0, " 󰎆 Discover "),
                 (1, " 󰓏 Playlist "),
-                (2, " 🔍 Search "),
+                (2, " 󰍉 Search "),
             ],
         };
 
