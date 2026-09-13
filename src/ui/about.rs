@@ -6,7 +6,7 @@ use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthChar;
 
 /// Modern About modal: elegant card layout with vinyl braille art,
 /// structured identity header, concise description, metadata specs,
@@ -65,18 +65,18 @@ pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
         return;
     }
 
-    let header_h = if inner.height >= 18 { 2 } else { 1 };
+    let top_h = if inner.height >= 18 { 7 } else { 2 };
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(header_h),
-            Constraint::Min(4),
+            Constraint::Length(top_h),
+            Constraint::Min(6),
             Constraint::Length(1),
         ])
         .split(inner);
 
-    draw_identity_header(frame, app, rows[0]);
-    draw_body(frame, app, rows[1]);
+    draw_top_section(frame, app, rows[0]);
+    draw_content_section(frame, app, rows[1]);
     draw_footer(frame, app, rows[2]);
 }
 
@@ -128,15 +128,64 @@ fn draw_compact(frame: &mut Frame, app: &App, size: Rect) {
         horizontal: 1,
         vertical: 1,
     });
-    draw_text_column(frame, app, inner);
+    draw_content_section(frame, app, inner);
 }
 
-fn draw_identity_header(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_top_section(frame: &mut Frame, app: &App, area: Rect) {
     if area.height == 0 || area.width == 0 {
         return;
     }
 
     let info = about_info();
+    let show_logo_art = area.height >= 6 && area.width >= 26;
+
+    if show_logo_art {
+        let logo_h = area.height.saturating_sub(2);
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(logo_h),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+        // 1. Centered logo art
+        let logo_lines = about_logo_lines(rows[0].width as usize, rows[0].height as usize);
+        frame.render_widget(
+            Paragraph::new(logo_lines)
+                .style(
+                    Style::default()
+                        .fg(app.theme.color_accent())
+                        .bg(app.theme.color_surface())
+                        .add_modifier(Modifier::BOLD),
+                )
+                .alignment(Alignment::Center),
+            rows[0],
+        );
+
+        // 2. Tagline with version
+        draw_tagline_line(frame, app, rows[1], info);
+
+        // 3. Horizontal divider line
+        draw_divider_line(frame, app, rows[2]);
+    } else {
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+        draw_tagline_line(frame, app, rows[0], info);
+        if area.height >= 2 {
+            draw_divider_line(frame, app, rows[1]);
+        }
+    }
+}
+
+fn draw_tagline_line(frame: &mut Frame, app: &App, area: Rect, info: &crate::tmplayer::data::about::AboutInfo) {
     let name_style = Style::default()
         .fg(app.theme.color_accent())
         .bg(app.theme.color_surface())
@@ -154,151 +203,36 @@ fn draw_identity_header(frame: &mut Frame, app: &App, area: Rect) {
         Language::En => "NetEase Cloud Music · TUI Player",
     };
 
-    let top = Rect {
-        x: area.x,
-        y: area.y,
-        width: area.width,
-        height: 1,
-    };
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled("󰎆 Tune", name_style),
             Span::styled("  ", Style::default().bg(app.theme.color_surface())),
             Span::styled(format!(" v{} ", info.version), badge_style),
-            Span::styled("  ·  ", Style::default().fg(app.theme.color_buff()).bg(app.theme.color_surface())),
-            Span::styled(tagline, tagline_style),
-        ])),
-        top,
-    );
-
-    if area.height >= 2 {
-        frame.render_widget(
-            Paragraph::new("─".repeat(area.width as usize)).style(
+            Span::styled(
+                "  ·  ",
                 Style::default()
                     .fg(app.theme.color_buff())
                     .bg(app.theme.color_surface()),
             ),
-            Rect {
-                x: area.x,
-                y: area.y + 1,
-                width: area.width,
-                height: 1,
-            },
-        );
-    }
+            Span::styled(tagline, tagline_style),
+        ]))
+        .alignment(Alignment::Center),
+        area,
+    );
 }
 
-fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
-    if area.width < 20 || area.height < 3 {
-        draw_text_column(frame, app, area);
-        return;
-    }
-
-    if area.width >= 62 {
-        // Horizontal two-column layout: Left is project name logo, Right is structured info
-        let cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(34),
-                Constraint::Length(1),
-                Constraint::Min(20),
-            ])
-            .split(area);
-
-        draw_art_panel(frame, app, cols[0]);
-
-        // Vertical separator line
-        let separator = (0..cols[1].height)
-            .map(|_| Line::from(Span::styled("│", Style::default().fg(app.theme.color_buff()))))
-            .collect::<Vec<_>>();
-        frame.render_widget(Paragraph::new(separator), cols[1]);
-
-        draw_text_column(
-            frame,
-            app,
-            cols[2].inner(ratatui::layout::Margin {
-                horizontal: 1,
-                vertical: 0,
-            }),
-        );
-    } else {
-        // Vertical stacked layout for narrow terminals
-        let show_art = area.height >= 14 && area.width >= 24;
-        if show_art {
-            let rows = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(7),
-                    Constraint::Min(6),
-                ])
-                .split(area);
-            draw_art_panel(frame, app, rows[0]);
-            draw_text_column(frame, app, rows[1]);
-        } else {
-            draw_text_column(frame, app, area);
-        }
-    }
+fn draw_divider_line(frame: &mut Frame, app: &App, area: Rect) {
+    frame.render_widget(
+        Paragraph::new("─".repeat(area.width as usize)).style(
+            Style::default()
+                .fg(app.theme.color_buff())
+                .bg(app.theme.color_surface()),
+        ),
+        area,
+    );
 }
 
-fn draw_art_panel(frame: &mut Frame, app: &App, area: Rect) {
-    if area.width < 8 || area.height < 4 {
-        return;
-    }
-
-    if area.height >= 8 {
-        let art_rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(5),
-                Constraint::Length(1),
-            ])
-            .split(area);
-
-        let lines = about_logo_lines(art_rows[0].width as usize, art_rows[0].height as usize);
-        frame.render_widget(
-            Paragraph::new(lines)
-                .style(
-                    Style::default()
-                        .fg(app.theme.color_accent())
-                        .bg(app.theme.color_surface()),
-                )
-                .alignment(Alignment::Center),
-            art_rows[0],
-        );
-
-        let badge_text = match app.config.language {
-            Language::Zh => "󰎆 键盘上的高保真音乐",
-            Language::En => "󰎆 Hi-Fi Audio in TUI",
-        };
-        frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(
-                    badge_text,
-                    Style::default()
-                        .fg(app.theme.color_accent2())
-                        .bg(app.theme.color_surface())
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ]))
-            .alignment(Alignment::Center),
-            art_rows[1],
-        );
-    } else {
-        let lines = about_logo_lines(area.width as usize, area.height as usize);
-        frame.render_widget(
-            Paragraph::new(lines)
-                .style(
-                    Style::default()
-                        .fg(app.theme.color_accent())
-                        .bg(app.theme.color_surface()),
-                )
-                .alignment(Alignment::Center),
-            area,
-        );
-    }
-}
-
-fn draw_text_column(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
     if area.width == 0 || area.height == 0 {
         return;
     }
@@ -306,7 +240,7 @@ fn draw_text_column(frame: &mut Frame, app: &App, area: Rect) {
     let info = about_info();
     let max_w = area.width as usize;
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let compact_space = area.height < 14;
+    let compact_space = area.height < 11;
 
     // ── 1. 简介 (Description) ──
     lines.push(section_header(
@@ -364,58 +298,8 @@ fn draw_text_column(frame: &mut Frame, app: &App, area: Rect) {
         info.license.as_str()
     };
 
-    let specs: Vec<(&str, &str, String)> = vec![
-        (
-            "󰏖",
-            match app.config.language {
-                Language::Zh => "版本",
-                Language::En => "Version",
-            },
-            format!("v{}", info.version),
-        ),
-        (
-            "󰑣",
-            match app.config.language {
-                Language::Zh => "作者",
-                Language::En => "Author",
-            },
-            author_val.to_string(),
-        ),
-        (
-            "󰊤",
-            match app.config.language {
-                Language::Zh => "源码",
-                Language::En => "Repo",
-            },
-            "https://github.com/aimy1/tune".to_string(),
-        ),
-        (
-            "󰋼",
-            match app.config.language {
-                Language::Zh => "反馈",
-                Language::En => "Issues",
-            },
-            "https://github.com/aimy1/tune/issues".to_string(),
-        ),
-        (
-            "󰿃",
-            match app.config.language {
-                Language::Zh => "协议",
-                Language::En => "License",
-            },
-            license_val.to_string(),
-        ),
-    ];
-
-    for (icon, label, val) in specs {
-        let label_text = format!(" {label} ");
-        let label_w = UnicodeWidthStr::width(label_text.as_str());
-        let icon_w = UnicodeWidthStr::width(icon) + 1;
-        let val_budget = max_w.saturating_sub(2 + icon_w + label_w + 1).max(8);
-        let clipped = clip_to_display_width(&val, val_budget);
-
-        lines.push(Line::from(vec![
-            Span::styled("  ", Style::default().bg(app.theme.color_surface())),
+    let spec_pill = |icon: &'static str, label: &str, val: &str| -> Vec<Span<'static>> {
+        vec![
             Span::styled(
                 format!("{icon} "),
                 Style::default()
@@ -423,7 +307,7 @@ fn draw_text_column(frame: &mut Frame, app: &App, area: Rect) {
                     .bg(app.theme.color_surface()),
             ),
             Span::styled(
-                label_text,
+                format!(" {label} "),
                 Style::default()
                     .fg(app.theme.color_base())
                     .bg(app.theme.color_buff())
@@ -431,12 +315,58 @@ fn draw_text_column(frame: &mut Frame, app: &App, area: Rect) {
             ),
             Span::styled(" ", Style::default().bg(app.theme.color_surface())),
             Span::styled(
-                clipped,
+                val.to_string(),
                 Style::default()
                     .fg(app.theme.color_text())
                     .bg(app.theme.color_surface()),
             ),
-        ]));
+        ]
+    };
+
+    let (v_lbl, a_lbl, l_lbl) = match app.config.language {
+        Language::Zh => ("版本", "作者", "协议"),
+        Language::En => ("Version", "Author", "License"),
+    };
+
+    if max_w >= 64 {
+        let mut r1_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+        r1_spans.extend(spec_pill("󰏖", v_lbl, &format!("v{}", info.version)));
+        r1_spans.push(Span::styled("    ", Style::default().bg(app.theme.color_surface())));
+        r1_spans.extend(spec_pill("󰑣", a_lbl, author_val));
+        r1_spans.push(Span::styled("    ", Style::default().bg(app.theme.color_surface())));
+        r1_spans.extend(spec_pill("󰿃", l_lbl, license_val));
+        lines.push(Line::from(r1_spans));
+
+        let repo_lbl = match app.config.language {
+            Language::Zh => "源码",
+            Language::En => "Repo",
+        };
+        let mut r2_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+        r2_spans.extend(spec_pill("󰊤", repo_lbl, "https://github.com/aimy1/tune"));
+        lines.push(Line::from(r2_spans));
+
+        let issues_lbl = match app.config.language {
+            Language::Zh => "反馈",
+            Language::En => "Issues",
+        };
+        let mut r3_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+        r3_spans.extend(spec_pill("󰋼", issues_lbl, "https://github.com/aimy1/tune/issues"));
+        lines.push(Line::from(r3_spans));
+    } else {
+        let items = [
+            ("󰏖", v_lbl, format!("v{}", info.version)),
+            ("󰑣", a_lbl, author_val.to_string()),
+            ("󰊤", "源码", "https://github.com/aimy1/tune".to_string()),
+            ("󰋼", "反馈", "https://github.com/aimy1/tune/issues".to_string()),
+            ("󰿃", l_lbl, license_val.to_string()),
+        ];
+        for (icon, label, val) in items {
+            let mut spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+            let val_budget = max_w.saturating_sub(16).max(8);
+            let clipped = clip_to_display_width(&val, val_budget);
+            spans.extend(spec_pill(icon, label, &clipped));
+            lines.push(Line::from(spans));
+        }
     }
 
     if !compact_space {
