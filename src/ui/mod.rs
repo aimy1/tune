@@ -57,8 +57,8 @@ pub fn draw_header_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         .add_modifier(Modifier::BOLD);
 
     let logo_text = match app.config.language {
-        crate::data::config::Language::Zh => " 󰎆 网易云 ",
-        crate::data::config::Language::En => " 󰎆 NetEase ",
+        crate::data::config::Language::Zh => " 󰎆 Tune ",
+        crate::data::config::Language::En => " 󰎆 Tune ",
     };
 
     let show_full_header = inner.width >= 80;

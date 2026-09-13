@@ -195,11 +195,11 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     if area.width >= 62 {
-        // Horizontal two-column layout: Left is vinyl art, Right is structured info
+        // Horizontal two-column layout: Left is project name logo, Right is structured info
         let cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(28),
+                Constraint::Length(34),
                 Constraint::Length(1),
                 Constraint::Min(20),
             ])
@@ -223,12 +223,12 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
         );
     } else {
         // Vertical stacked layout for narrow terminals
-        let show_art = area.height >= 18 && area.width >= 24;
+        let show_art = area.height >= 14 && area.width >= 24;
         if show_art {
             let rows = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(12),
+                    Constraint::Length(7),
                     Constraint::Min(6),
                 ])
                 .split(area);
@@ -245,11 +245,11 @@ fn draw_art_panel(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    if area.height >= 14 {
+    if area.height >= 8 {
         let art_rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(12),
+                Constraint::Min(5),
                 Constraint::Length(1),
             ])
             .split(area);
@@ -540,7 +540,7 @@ fn surface_style(app: &App) -> Style {
 }
 
 fn modal_area(size: Rect) -> Rect {
-    let want_w = 74u16;
+    let want_w = 76u16;
     let want_h = 22u16;
 
     let max_w = size.width.saturating_sub(2);
