@@ -886,8 +886,9 @@ fn render_about_braille(f: &mut ratatui::Frame, area: Rect, app: &mut AppState) 
     let lines = about_braille_lines(area.width as usize, area.height as usize);
     let p = Paragraph::new(lines).style(
         Style::default()
-            .fg(app.theme.color_text())
-            .bg(app.theme.color_surface()),
+            .fg(app.theme.color_accent())
+            .bg(app.theme.color_surface())
+            .add_modifier(Modifier::BOLD),
     );
     f.render_widget(p, area);
 }

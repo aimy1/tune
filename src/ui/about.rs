@@ -79,7 +79,14 @@ fn draw_about_content(frame: &mut Frame, app: &App, area: Rect) {
     // 1. Logo Art (if height allows)
     let show_art = area.height >= 9 && area.width >= 26;
     if show_art {
-        let logo_lines = about_logo_lines(area.width as usize, 5);
+        let max_logo_h = if area.height >= 12 && area.width >= 48 {
+            6
+        } else if area.height >= 10 && area.width >= 38 {
+            5
+        } else {
+            4
+        };
+        let logo_lines = about_logo_lines(app, area.width as usize, max_logo_h);
         lines.extend(logo_lines);
         lines.push(blank_line(app));
     }
@@ -90,7 +97,7 @@ fn draw_about_content(frame: &mut Frame, app: &App, area: Rect) {
         .bg(app.theme.color_accent2())
         .add_modifier(Modifier::BOLD);
     lines.push(Line::from(vec![
-        Span::styled(format!(" v{} ", info.version), badge_style),
+        Span::styled(format!(" 󰎆 v{} ", info.version), badge_style),
     ]));
 
     // 3. Tagline & Author
@@ -159,7 +166,7 @@ fn surface_style(app: &App) -> Style {
 
 fn modal_area(size: Rect) -> Rect {
     let want_w = 58u16;
-    let want_h = 15u16;
+    let want_h = 16u16;
 
     let max_w = size.width.saturating_sub(2);
     let max_h = size.height.saturating_sub(1);
@@ -180,7 +187,7 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
 }
 
 /// Center the logo in the panel; if the panel is smaller, crop from the center.
-fn about_logo_lines(width: usize, height: usize) -> Vec<Line<'static>> {
+fn about_logo_lines(app: &App, width: usize, height: usize) -> Vec<Line<'static>> {
     let blank = " ".repeat(width);
     if width == 0 || height == 0 {
         return Vec::new();
@@ -239,8 +246,39 @@ fn about_logo_lines(width: usize, height: usize) -> Vec<Line<'static>> {
         }
     }
 
+    let total_rows = grid.len();
+    let c1 = app.theme.palette.accent;
+    let c2 = app.theme.palette.accent2;
+
     grid.into_iter()
-        .map(|row| Line::from(row.into_iter().collect::<String>()))
+        .enumerate()
+        .map(|(r_idx, row)| {
+            let color = match app.theme.capability {
+                crate::ui::theme::ColorCapability::TrueColor => {
+                    let t = if total_rows <= 1 {
+                        0.0
+                    } else {
+                        r_idx as f32 / (total_rows - 1) as f32
+                    };
+                    let r = (c1.0 as f32 * (1.0 - t) + c2.0 as f32 * t).round() as u8;
+                    let g = (c1.1 as f32 * (1.0 - t) + c2.1 as f32 * t).round() as u8;
+                    let b = (c1.2 as f32 * (1.0 - t) + c2.2 as f32 * t).round() as u8;
+                    ratatui::style::Color::Rgb(r, g, b)
+                }
+                _ => {
+                    if r_idx < total_rows / 2 {
+                        app.theme.color_accent()
+                    } else {
+                        app.theme.color_accent2()
+                    }
+                }
+            };
+            let text: String = row.into_iter().collect();
+            Line::from(Span::styled(
+                text,
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ))
+        })
         .collect()
 }
 
