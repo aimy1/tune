@@ -33,6 +33,7 @@ pub struct AudioPlayer {
     started_at: Option<Instant>,
     eq: EqSettings,
     eq_params: Arc<EqParams>,
+    volume: f32,
     /// Receives buffer progress updates pushed from StreamingReader.
     progress_rx: Option<Receiver<(u64, u64)>>,
 }
@@ -64,6 +65,7 @@ impl AudioPlayer {
             started_at: None,
             eq,
             eq_params,
+            volume: config.volume.clamp(0.0, 1.0),
             progress_rx: None,
         };
 
@@ -103,6 +105,7 @@ impl AudioPlayer {
             .as_ref()
             .ok_or_else(|| anyhow!("audio output device_sink not initialized"))?;
         let player = Player::connect_new(device_sink.mixer());
+        player.set_volume(self.volume);
         player.append(source);
         player.play();
 
@@ -142,6 +145,7 @@ impl AudioPlayer {
             .as_ref()
             .context("audio output device_sink not initialized")?;
         let player = Player::connect_new(device_sink.mixer());
+        player.set_volume(self.volume);
         player.append(source);
         player.play();
 
@@ -157,6 +161,18 @@ impl AudioPlayer {
         self.started_at = Some(Instant::now());
         self.progress_rx = Some(progress_rx);
         Ok(())
+    }
+
+    pub fn set_volume(&mut self, volume: f32) {
+        self.volume = volume.clamp(0.0, 1.0);
+        if let Some(player) = &self.sink {
+            player.set_volume(self.volume);
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn volume(&self) -> f32 {
+        self.volume
     }
 
     pub fn set_eq(&mut self, eq: EqSettings) -> Result<()> {
@@ -267,6 +283,7 @@ impl AudioPlayer {
             .as_ref()
             .ok_or_else(|| anyhow!("audio output device_sink not initialized"))?;
         let player = Player::connect_new(device_sink.mixer());
+        player.set_volume(self.volume);
         player.append(source);
         if was_paused {
             player.pause();

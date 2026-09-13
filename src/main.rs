@@ -53,6 +53,7 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
                 app::PlaybackRepeatMode::LoopOne => tmplayer::HostRepeatMode::LoopOne,
             },
             position: runtime.position,
+            volume: runtime.volume,
         }
     }
 
@@ -73,6 +74,7 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
                     app::PlaybackRepeatMode::LoopOne => tmplayer::HostRepeatMode::LoopOne,
                 },
                 position: Duration::from_secs(0),
+                volume: snapshot.volume,
             };
         }
 
@@ -120,6 +122,7 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
                 app::PlaybackRepeatMode::LoopOne => tmplayer::HostRepeatMode::LoopOne,
             },
             position: snapshot.position,
+            volume: snapshot.volume,
         }
     }
 
@@ -157,6 +160,14 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
 
     async fn toggle_like_current(&mut self) -> Result<bool, String> {
         self.app.fullscreen_toggle_like().await
+    }
+
+    fn set_volume(&mut self, volume: f32) {
+        self.app.set_volume(volume);
+    }
+
+    fn volume(&self) -> f32 {
+        self.app.volume
     }
 }
 

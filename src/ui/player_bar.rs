@@ -3,7 +3,7 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use std::time::Duration;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -61,11 +61,25 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     let next_label = "  ";
     let mode_symbol = playback_repeat_symbol(app);
 
+    let vol_pct = (app.volume * 100.0).round() as i32;
+    let is_muted = vol_pct == 0;
+    let vol_icon = if is_muted {
+        "󰝟"
+    } else if vol_pct < 33 {
+        "󰕿"
+    } else if vol_pct < 66 {
+        "󰖀"
+    } else {
+        "󰕾"
+    };
+    let vol_label = format!("[{vol_icon} {vol_pct}%]");
+
     let prev_w = display_width(prev_label) as u16;
     let play_w = display_width(play_label) as u16;
     let next_w = display_width(next_label) as u16;
     let mode_w = display_width(mode_symbol) as u16;
-    let controls_w = prev_w + 1 + play_w + 1 + next_w + 2 + mode_w;
+    let vol_w = display_width(&vol_label) as u16;
+    let controls_w = prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w;
 
     let spectrum =
         if app.now_playing.is_some() && app.playback_state != PlaybackRuntimeState::Stopped {
@@ -192,21 +206,51 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         mode_symbol,
         with_bar_bg(Style::default().fg(app.theme.color_subtext())),
     );
+    let is_vol_modal_open = matches!(app.overlay, Some(crate::app::Overlay::VolumeModal));
+    let vol_spans = if is_vol_modal_open {
+        vec![Span::styled(
+            vol_label,
+            Style::default()
+                .fg(app.theme.color_base())
+                .bg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )]
+    } else {
+        vec![
+            Span::styled("[", with_bar_bg(Style::default().fg(app.theme.color_subtext()))),
+            Span::styled(
+                vol_icon,
+                with_bar_bg(Style::default().fg(if is_muted {
+                    app.theme.color_subtext()
+                } else {
+                    app.theme.color_accent()
+                })),
+            ),
+            Span::styled(
+                format!(" {vol_pct}%]"),
+                with_bar_bg(Style::default().fg(app.theme.color_text())),
+            ),
+        ]
+    };
     let gap = Span::styled(" ", with_bar_bg(Style::default()));
     let gap2 = Span::styled("  ", with_bar_bg(Style::default()));
 
+    let mut controls_spans = vec![
+        gap.clone(),
+        prev_span,
+        gap.clone(),
+        play_span,
+        gap,
+        next_span,
+        gap2.clone(),
+        mode_span,
+        gap2,
+    ];
+    controls_spans.extend(vol_spans);
+
     frame.render_widget(
-        Paragraph::new(Line::from(vec![
-            gap.clone(),
-            prev_span,
-            gap.clone(),
-            play_span,
-            gap,
-            next_span,
-            gap2,
-            mode_span,
-        ]))
-        .alignment(Alignment::Center),
+        Paragraph::new(Line::from(controls_spans))
+            .alignment(Alignment::Center),
         controls_rect,
     );
 
@@ -238,7 +282,7 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut hits = PlayerBarHitTargets::default();
 
-    let line_w = 1 + prev_w + 1 + play_w + 1 + next_w + 2 + mode_w;
+    let line_w = 1 + prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w;
     let line_start_x = controls_rect.x + controls_rect.width.saturating_sub(line_w) / 2;
 
     let prev_x = line_start_x.saturating_add(1);
@@ -269,7 +313,15 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     hits.repeat_mode = Some(HitRect {
         x: mode_x.saturating_sub(1),
         y: top.y,
-        width: mode_w.saturating_add(3),
+        width: mode_w.saturating_add(2),
+        height: 1,
+    });
+
+    let vol_x = mode_x.saturating_add(mode_w).saturating_add(2);
+    hits.volume = Some(HitRect {
+        x: vol_x,
+        y: top.y,
+        width: vol_w,
         height: 1,
     });
 
@@ -408,5 +460,114 @@ fn playback_repeat_symbol(app: &App) -> &'static str {
         crate::app::PlaybackRepeatMode::Shuffle => "",
         crate::app::PlaybackRepeatMode::LoopAll => "",
         crate::app::PlaybackRepeatMode::LoopOne => "",
+    }
+}
+
+pub fn draw_volume_modal_overlay(frame: &mut Frame, app: &App) {
+    let rect = app.volume_popover_rect();
+    if rect.width == 0 || rect.height == 0 {
+        return;
+    }
+
+    let frame_area = frame.area();
+    let area = Rect {
+        x: rect.x.min(frame_area.width.saturating_sub(rect.width)),
+        y: rect.y.min(frame_area.height.saturating_sub(rect.height)),
+        width: rect.width.min(frame_area.width),
+        height: rect.height.min(frame_area.height),
+    };
+
+    frame.render_widget(Clear, area);
+
+    let vol = app.volume.clamp(0.0, 1.0);
+    let vol_pct = (vol * 100.0).round() as i32;
+    let is_muted = vol_pct == 0;
+    let vol_icon = if is_muted {
+        "󰝟"
+    } else if vol_pct < 33 {
+        "󰕿"
+    } else if vol_pct < 66 {
+        "󰖀"
+    } else {
+        "󰕾"
+    };
+
+    let bg = app.theme.color_surface();
+    let accent_style = Style::default()
+        .fg(app.theme.color_accent())
+        .add_modifier(Modifier::BOLD)
+        .bg(bg);
+    let subtext_style = Style::default().fg(app.theme.color_subtext()).bg(bg);
+    let text_style = Style::default()
+        .fg(app.theme.color_text())
+        .add_modifier(Modifier::BOLD)
+        .bg(bg);
+
+    let filled = (vol * 10.0).round() as usize;
+    let filled_s = "█".repeat(filled.min(10));
+    let empty_s = "░".repeat(10usize.saturating_sub(filled.min(10)));
+
+    let line = Line::from(vec![
+        Span::styled("[ ", subtext_style),
+        Span::styled(
+            vol_icon,
+            if is_muted {
+                subtext_style
+            } else {
+                accent_style
+            },
+        ),
+        Span::styled(" ", Style::default().bg(bg)),
+        Span::styled(filled_s, accent_style),
+        Span::styled(empty_s, subtext_style),
+        Span::styled(" ", Style::default().bg(bg)),
+        Span::styled(format!("{vol_pct:>3}%"), text_style),
+        Span::styled(" ]", subtext_style),
+    ]);
+
+    frame.render_widget(Paragraph::new(line).style(Style::default().bg(bg)), area);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_player_bar_hits_volume() {
+        let mut hits = PlayerBarHitTargets::default();
+        assert!(hits.volume.is_none());
+        hits.volume = Some(HitRect {
+            x: 50,
+            y: 20,
+            width: 9,
+            height: 1,
+        });
+        let rect = hits.volume.unwrap();
+        assert!(rect.contains(50, 20));
+        assert!(rect.contains(58, 20));
+        assert!(!rect.contains(59, 20));
+        assert!(!rect.contains(49, 20));
+        assert!(!rect.contains(50, 19));
+    }
+
+    #[test]
+    fn test_volume_popover_geometry() {
+        let btn = HitRect {
+            x: 50,
+            y: 20,
+            width: 9,
+            height: 1,
+        };
+        let popup_w: u16 = 21;
+        let popup_h: u16 = 1;
+        let center_x = btn.x + btn.width / 2;
+        let x = center_x.saturating_sub(popup_w / 2).max(1);
+        let y = btn.y.saturating_sub(popup_h + 1);
+
+        assert_eq!(center_x, 54);
+        assert_eq!(x, 44);
+        assert_eq!(y, 18);
+        assert_eq!(popup_w, 21);
+        assert_eq!(popup_h, 1);
     }
 }

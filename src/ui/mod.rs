@@ -178,6 +178,9 @@ pub fn draw_settings(frame: &mut Frame, app: &mut App) {
     if matches!(app.overlay, Some(Overlay::SearchBox)) {
         search_box::draw_search_box_overlay(frame, app);
     }
+    if matches!(app.overlay, Some(Overlay::VolumeModal)) {
+        player_bar::draw_volume_modal_overlay(frame, app);
+    }
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App) {

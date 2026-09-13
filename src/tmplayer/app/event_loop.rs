@@ -474,6 +474,7 @@ fn sync_from_host_snapshot(app: &mut AppState, snapshot: HostPlaybackSnapshot) {
     app.player.repeat_mode = map_host_repeat(snapshot.repeat_mode);
     app.player.liked = snapshot.current_liked;
     app.player.position = snapshot.position;
+    app.player.volume = snapshot.volume;
     app.player.track = current_track;
 
     enforce_ncm_cover_memory_policy(app, current);
@@ -496,6 +497,11 @@ fn apply_host_runtime_snapshot(app: &mut AppState, runtime: HostPlaybackRuntimeS
 
     if app.player.liked != runtime.current_liked {
         app.player.liked = runtime.current_liked;
+        changed = true;
+    }
+
+    if (app.player.volume - runtime.volume).abs() > 0.001 {
+        app.player.volume = runtime.volume;
         changed = true;
     }
 
@@ -1723,83 +1729,108 @@ async fn handle_action(
                 }
             }
         }
-        Action::VolumeUp => match app.player.mode {
-            PlayMode::LocalPlayback => {
-                mode_manager
-                    .local
-                    .set_volume((mode_manager.local.volume() + 0.05).min(1.0));
+        Action::VolumeUp => {
+            if let Some(bridge) = host_bridge.as_mut() {
+                let cur = (*bridge).volume();
+                let next = (cur + 0.05).min(1.0);
+                (*bridge).set_volume(next);
+                app.player.volume = next;
+                return Ok(());
             }
-            PlayMode::SystemMonitor => {
-                if let Some(sysvol) = system_volume {
-                    if let Ok(v) = sysvol.set_delta(0.05) {
-                        app.player.volume = v;
+            match app.player.mode {
+                PlayMode::LocalPlayback => {
+                    mode_manager
+                        .local
+                        .set_volume((mode_manager.local.volume() + 0.05).min(1.0));
+                }
+                PlayMode::SystemMonitor => {
+                    if let Some(sysvol) = system_volume {
+                        if let Ok(v) = sysvol.set_delta(0.05) {
+                            app.player.volume = v;
+                        } else {
+                            let _ = mode_manager.mpris.set_volume_delta(0.05);
+                        }
                     } else {
                         let _ = mode_manager.mpris.set_volume_delta(0.05);
                     }
-                } else {
-                    let _ = mode_manager.mpris.set_volume_delta(0.05);
                 }
-            }
-            PlayMode::Idle => {
-                if let Some(sysvol) = system_volume {
-                    if let Ok(v) = sysvol.set_delta(0.05) {
-                        app.player.volume = v;
+                PlayMode::Idle => {
+                    if let Some(sysvol) = system_volume {
+                        if let Ok(v) = sysvol.set_delta(0.05) {
+                            app.player.volume = v;
+                        }
                     }
                 }
             }
-        },
-        Action::VolumeDown => match app.player.mode {
-            PlayMode::LocalPlayback => {
-                mode_manager
-                    .local
-                    .set_volume((mode_manager.local.volume() - 0.05).max(0.0));
+        }
+        Action::VolumeDown => {
+            if let Some(bridge) = host_bridge.as_mut() {
+                let cur = (*bridge).volume();
+                let next = (cur - 0.05).max(0.0);
+                (*bridge).set_volume(next);
+                app.player.volume = next;
+                return Ok(());
             }
-            PlayMode::SystemMonitor => {
-                if let Some(sysvol) = system_volume {
-                    if let Ok(v) = sysvol.set_delta(-0.05) {
-                        app.player.volume = v;
+            match app.player.mode {
+                PlayMode::LocalPlayback => {
+                    mode_manager
+                        .local
+                        .set_volume((mode_manager.local.volume() - 0.05).max(0.0));
+                }
+                PlayMode::SystemMonitor => {
+                    if let Some(sysvol) = system_volume {
+                        if let Ok(v) = sysvol.set_delta(-0.05) {
+                            app.player.volume = v;
+                        } else {
+                            let _ = mode_manager.mpris.set_volume_delta(-0.05);
+                        }
                     } else {
                         let _ = mode_manager.mpris.set_volume_delta(-0.05);
                     }
-                } else {
-                    let _ = mode_manager.mpris.set_volume_delta(-0.05);
                 }
-            }
-            PlayMode::Idle => {
-                if let Some(sysvol) = system_volume {
-                    if let Ok(v) = sysvol.set_delta(-0.05) {
-                        app.player.volume = v;
+                PlayMode::Idle => {
+                    if let Some(sysvol) = system_volume {
+                        if let Ok(v) = sysvol.set_delta(-0.05) {
+                            app.player.volume = v;
+                        }
                     }
                 }
             }
-        },
-        Action::SetVolume(v) => match app.player.mode {
-            PlayMode::LocalPlayback => {
-                mode_manager.local.set_volume(v);
+        }
+        Action::SetVolume(v) => {
+            if let Some(bridge) = host_bridge.as_mut() {
+                (*bridge).set_volume(v);
+                app.player.volume = v;
+                return Ok(());
             }
-            PlayMode::SystemMonitor => {
-                if let Some(sysvol) = system_volume {
-                    if sysvol.set(v).is_ok() {
-                        app.player.volume = v;
+            match app.player.mode {
+                PlayMode::LocalPlayback => {
+                    mode_manager.local.set_volume(v);
+                }
+                PlayMode::SystemMonitor => {
+                    if let Some(sysvol) = system_volume {
+                        if sysvol.set(v).is_ok() {
+                            app.player.volume = v;
+                        } else {
+                            // delta setter exists; approximate absolute set
+                            let cur = app.player.volume;
+                            let _ = mode_manager.mpris.set_volume_delta(v - cur);
+                        }
                     } else {
                         // delta setter exists; approximate absolute set
                         let cur = app.player.volume;
                         let _ = mode_manager.mpris.set_volume_delta(v - cur);
                     }
-                } else {
-                    // delta setter exists; approximate absolute set
-                    let cur = app.player.volume;
-                    let _ = mode_manager.mpris.set_volume_delta(v - cur);
                 }
-            }
-            PlayMode::Idle => {
-                if let Some(sysvol) = system_volume {
-                    if sysvol.set(v).is_ok() {
-                        app.player.volume = v;
+                PlayMode::Idle => {
+                    if let Some(sysvol) = system_volume {
+                        if sysvol.set(v).is_ok() {
+                            app.player.volume = v;
+                        }
                     }
                 }
             }
-        },
+        }
         Action::ToggleMute => {
             let target_vol = if app.player.volume > 0.001 {
                 app.pre_mute_volume = Some(app.player.volume);

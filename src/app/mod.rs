@@ -89,6 +89,7 @@ pub enum Overlay {
     SettingsKeybinds,
     SettingsAbout,
     SearchBox,
+    VolumeModal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1509,6 +1510,7 @@ pub struct PlayerBarHitTargets {
     pub play_pause: Option<HitRect>,
     pub next: Option<HitRect>,
     pub repeat_mode: Option<HitRect>,
+    pub volume: Option<HitRect>,
     pub heart: Option<HitRect>,
     pub progress: Option<HitRect>,
 }
@@ -1522,6 +1524,7 @@ pub struct FullscreenPlaybackSnapshot {
     pub state: PlaybackRuntimeState,
     pub repeat_mode: PlaybackRepeatMode,
     pub position: Duration,
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1531,6 +1534,7 @@ pub struct FullscreenRuntimeSnapshot {
     pub state: PlaybackRuntimeState,
     pub repeat_mode: PlaybackRepeatMode,
     pub position: Duration,
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -1671,6 +1675,9 @@ pub struct App {
     mpris_last_playback: PlaybackRuntimeState,
     api: ApiState,
     audio_player: AudioPlayer,
+    pub volume: f32,
+    pub pre_mute_volume: Option<f32>,
+    system_volume: Option<crate::tmplayer::utils::system_volume::SystemVolume>,
     pub graphics_picker: Picker,
 }
 
@@ -1681,7 +1688,14 @@ impl App {
 
     pub async fn new(config: Config, theme: Theme) -> Result<Self> {
         let saved_cookie = session::load_cookie().ok().flatten();
-        let audio_player = AudioPlayer::new(&config);
+        let system_volume = crate::tmplayer::utils::system_volume::SystemVolume::try_new().ok();
+        let volume = system_volume
+            .as_ref()
+            .and_then(|s| s.get().ok())
+            .unwrap_or(config.volume)
+            .clamp(0.0, 1.0);
+        let mut audio_player = AudioPlayer::new(&config);
+        audio_player.set_volume(volume);
 
         let mut headers = header::HeaderMap::new();
         headers.insert(
@@ -1782,6 +1796,9 @@ impl App {
             mpris_last_playback: PlaybackRuntimeState::Stopped,
             api,
             audio_player,
+            volume,
+            pre_mute_volume: None,
+            system_volume,
             graphics_picker: Picker::halfblocks(),
         };
 
@@ -1932,6 +1949,14 @@ impl App {
             return;
         }
 
+        if self.page != Page::Login
+            && key.modifiers.is_empty()
+            && matches!(key.code, KeyCode::Char('v') | KeyCode::Char('V'))
+        {
+            self.toggle_volume_modal();
+            return;
+        }
+
         match self.page {
             Page::Login => self.handle_login_key(key).await,
             Page::Loading => {}
@@ -1952,14 +1977,44 @@ impl App {
 
         match mouse.kind {
             MouseEventKind::ScrollUp => {
+                if matches!(self.overlay, Some(Overlay::VolumeModal)) {
+                    self.volume_up();
+                    return;
+                }
+                if let Some(rect) = self.player_bar_hits.volume {
+                    if rect.contains(col, row) {
+                        self.volume_up();
+                        return;
+                    }
+                }
                 self.handle_content_scroll(col, row, false).await;
             }
             MouseEventKind::ScrollDown => {
+                if matches!(self.overlay, Some(Overlay::VolumeModal)) {
+                    self.volume_down();
+                    return;
+                }
+                if let Some(rect) = self.player_bar_hits.volume {
+                    if rect.contains(col, row) {
+                        self.volume_down();
+                        return;
+                    }
+                }
                 self.handle_content_scroll(col, row, true).await;
             }
             MouseEventKind::Down(MouseButton::Left) => {
                 if matches!(self.overlay, Some(Overlay::SearchBox)) {
                     self.handle_search_box_click(col, row);
+                    return;
+                }
+
+                if matches!(self.overlay, Some(Overlay::VolumeModal)) {
+                    let rect = self.volume_popover_rect();
+                    if !rect.contains(col, row) {
+                        self.overlay = None;
+                        return;
+                    }
+                    self.handle_volume_popover_click(col, row);
                     return;
                 }
 
@@ -1992,6 +2047,12 @@ impl App {
                 if let Some(rect) = self.player_bar_hits.repeat_mode {
                     if rect.contains(col, row) {
                         self.cycle_repeat_mode_hotkey();
+                        return;
+                    }
+                }
+                if let Some(rect) = self.player_bar_hits.volume {
+                    if rect.contains(col, row) {
+                        self.toggle_volume_modal();
                         return;
                     }
                 }
@@ -2035,6 +2096,11 @@ impl App {
             || self
                 .player_bar_hits
                 .repeat_mode
+                .map(|rect| rect.contains(col, row))
+                .unwrap_or(false)
+            || self
+                .player_bar_hits
+                .volume
                 .map(|rect| rect.contains(col, row))
                 .unwrap_or(false)
             || self
@@ -2394,6 +2460,7 @@ impl App {
             state: self.playback_state,
             repeat_mode: self.playback_repeat_mode,
             position: self.audio_player.position(),
+            volume: self.volume,
         }
     }
 
@@ -2404,6 +2471,7 @@ impl App {
             state: self.playback_state,
             repeat_mode: self.playback_repeat_mode,
             position: self.audio_player.position(),
+            volume: self.volume,
         }
     }
 
@@ -2473,6 +2541,122 @@ impl App {
         self.toggle_like_hotkey().await
     }
 
+    pub fn set_volume(&mut self, volume: f32) {
+        let v = volume.clamp(0.0, 1.0);
+        self.volume = v;
+        self.audio_player.set_volume(v);
+        if let Some(sysvol) = self.system_volume.as_ref() {
+            let _ = sysvol.set(v);
+        }
+        self.config.volume = v;
+    }
+
+    pub fn volume_up(&mut self) {
+        let next = (self.volume + 0.05).min(1.0);
+        self.set_volume(next);
+    }
+
+    pub fn volume_down(&mut self) {
+        let next = (self.volume - 0.05).max(0.0);
+        self.set_volume(next);
+    }
+
+    pub fn toggle_mute(&mut self) {
+        let target_vol = if self.volume > 0.001 {
+            self.pre_mute_volume = Some(self.volume);
+            0.0
+        } else {
+            self.pre_mute_volume.unwrap_or(0.5).clamp(0.05, 1.0)
+        };
+        self.set_volume(target_vol);
+    }
+
+    pub fn toggle_volume_modal(&mut self) {
+        if self.overlay == Some(Overlay::VolumeModal) {
+            self.overlay = None;
+        } else {
+            self.overlay = Some(Overlay::VolumeModal);
+        }
+    }
+
+    pub fn volume_popover_rect(&self) -> HitRect {
+        let popup_w: u16 = 21;
+        let popup_h: u16 = 1;
+        let Some(btn) = self.player_bar_hits.volume else {
+            return HitRect {
+                x: 0,
+                y: 0,
+                width: 0,
+                height: 0,
+            };
+        };
+
+        let center_x = btn.x + btn.width / 2;
+        let x = center_x.saturating_sub(popup_w / 2).max(1);
+        let y = btn.y.saturating_sub(popup_h + 1);
+        HitRect {
+            x,
+            y,
+            width: popup_w,
+            height: popup_h,
+        }
+    }
+
+    pub fn handle_volume_popover_click(&mut self, col: u16, row: u16) {
+        let rect = self.volume_popover_rect();
+        if !rect.contains(col, row) {
+            return;
+        }
+
+        let x = rect.x;
+        // Left bracket: 0%
+        if col <= x + 1 {
+            self.set_volume(0.0);
+            return;
+        }
+
+        // Icon area: toggle mute
+        if col <= x + 3 {
+            self.toggle_mute();
+            return;
+        }
+
+        // 10-block slider
+        if col >= x + 4 && col <= x + 13 {
+            let block = col - (x + 4);
+            let ratio = ((block as f32 + 0.5) / 10.0).clamp(0.0, 1.0);
+            self.set_volume(ratio);
+            return;
+        }
+
+        // Right bracket: 100%
+        if col >= x + 19 {
+            self.set_volume(1.0);
+            return;
+        }
+
+        // Percentage text: toggle mute
+        self.toggle_mute();
+    }
+
+    fn handle_volume_modal_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('v') | KeyCode::Char('V') | KeyCode::Enter => {
+                self.overlay = None;
+            }
+            KeyCode::Left | KeyCode::Down => {
+                self.volume_down();
+            }
+            KeyCode::Right | KeyCode::Up => {
+                self.volume_up();
+            }
+            KeyCode::Char(' ') | KeyCode::Char('m') | KeyCode::Char('M') => {
+                self.toggle_mute();
+            }
+            _ => {}
+        }
+    }
+
     async fn handle_overlay_key(&mut self, overlay: Overlay, key: KeyEvent) {
         match overlay {
             Overlay::Settings => self.handle_settings_root_key(key).await,
@@ -2480,6 +2664,7 @@ impl App {
             Overlay::SettingsKeybinds => self.handle_settings_keybinds_key(key),
             Overlay::SettingsAbout => self.handle_settings_about_key(key),
             Overlay::SearchBox => self.handle_search_box_key(key).await,
+            Overlay::VolumeModal => self.handle_volume_modal_key(key),
         }
     }
 
@@ -3013,6 +3198,15 @@ impl App {
     }
 
     async fn tick_audio(&mut self) {
+        if let Some(sysvol) = self.system_volume.as_ref() {
+            if let Ok(v) = sysvol.get() {
+                if (v - self.volume).abs() > 0.01 {
+                    self.volume = v;
+                    self.audio_player.set_volume(v);
+                }
+            }
+        }
+
         let runtime = map_audio_state(self.audio_player.state());
 
         if self.playback_state == PlaybackRuntimeState::Playing

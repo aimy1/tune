@@ -84,6 +84,7 @@ pub struct HostPlaybackSnapshot {
     pub state: HostPlaybackState,
     pub repeat_mode: HostRepeatMode,
     pub position: Duration,
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -93,6 +94,7 @@ pub struct HostPlaybackRuntimeSnapshot {
     pub state: HostPlaybackState,
     pub repeat_mode: HostRepeatMode,
     pub position: Duration,
+    pub volume: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +134,8 @@ pub trait HostPlaybackBridge {
     fn seek_to_ratio(&mut self, ratio: f32);
     fn toggle_repeat_mode(&mut self);
     async fn toggle_like_current(&mut self) -> Result<bool, String>;
+    fn set_volume(&mut self, volume: f32);
+    fn volume(&self) -> f32;
 }
 
 pub async fn run_fullscreen(

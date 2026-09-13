@@ -128,6 +128,9 @@ pub struct Config {
     #[serde(default = "default_show_hints")]
     pub show_hints: bool,
 
+    #[serde(default = "default_volume")]
+    pub volume: f32,
+
     #[serde(default)]
     pub home_more_recommend: bool,
 
@@ -411,6 +414,10 @@ fn default_show_hints() -> bool {
     true
 }
 
+fn default_volume() -> f32 {
+    1.0
+}
+
 fn default_cache_max_size_mb() -> u64 {
     500
 }
@@ -530,6 +537,7 @@ impl Default for Config {
             playback_memory: false,
             transparent_sidebar: false,
             show_hints: default_show_hints(),
+            volume: default_volume(),
             home_more_recommend: false,
             cache: CacheConfig::default(),
             keybind_search_box: default_keybind_search_box(),
