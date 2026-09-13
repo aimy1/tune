@@ -8,9 +8,8 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use unicode_width::UnicodeWidthChar;
 
-/// Modern About modal: elegant card layout with vinyl braille art,
-/// structured identity header, concise description, metadata specs,
-/// tech stack pills, and responsive resizing.
+/// Modern concise About modal: clean rounded border with no border text,
+/// centered TUNE logo, airy metadata rows, tech stack badges, and soft exit hint.
 pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
     if size.width < 40 || size.height < 14 {
         draw_compact(frame, app, size);
@@ -20,34 +19,11 @@ pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
     let area = modal_area(size);
     frame.render_widget(Clear, area);
 
-    let title = match app.config.language {
-        Language::Zh => " 󰎆 关于 Tune ",
-        Language::En => " 󰎆 About Tune ",
-    };
-
-    let back_hint = match app.config.language {
-        Language::Zh => " 返回 ",
-        Language::En => " Back ",
-    };
-
+    // Clean border with NO text on borders
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .title(title)
-            .title_bottom(Line::from(vec![
-                Span::styled(
-                    " Esc / q ",
-                    Style::default()
-                        .fg(app.theme.color_base())
-                        .bg(app.theme.color_buff())
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    back_hint,
-                    Style::default().fg(app.theme.color_subtext()),
-                ),
-            ]))
             .border_style(
                 Style::default()
                     .fg(app.theme.color_accent())
@@ -65,7 +41,7 @@ pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
         return;
     }
 
-    let top_h = if inner.height >= 18 { 7 } else { 2 };
+    let top_h = if inner.height >= 16 { 7 } else { 2 };
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -88,33 +64,11 @@ fn draw_compact(frame: &mut Frame, app: &App, size: Rect) {
     );
     frame.render_widget(Clear, area);
 
-    let title = match app.config.language {
-        Language::Zh => " 󰎆 关于 Tune ",
-        Language::En => " 󰎆 About Tune ",
-    };
-    let back_hint = match app.config.language {
-        Language::Zh => " 返回 ",
-        Language::En => " Back ",
-    };
-
+    // Clean border with NO text on borders
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
-            .title(title)
-            .title_bottom(Line::from(vec![
-                Span::styled(
-                    " Esc / q ",
-                    Style::default()
-                        .fg(app.theme.color_base())
-                        .bg(app.theme.color_buff())
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    back_hint,
-                    Style::default().fg(app.theme.color_subtext()),
-                ),
-            ]))
             .border_style(
                 Style::default()
                     .fg(app.theme.color_accent())
@@ -185,11 +139,12 @@ fn draw_top_section(frame: &mut Frame, app: &App, area: Rect) {
     }
 }
 
-fn draw_tagline_line(frame: &mut Frame, app: &App, area: Rect, info: &crate::tmplayer::data::about::AboutInfo) {
-    let name_style = Style::default()
-        .fg(app.theme.color_accent())
-        .bg(app.theme.color_surface())
-        .add_modifier(Modifier::BOLD);
+fn draw_tagline_line(
+    frame: &mut Frame,
+    app: &App,
+    area: Rect,
+    info: &crate::tmplayer::data::about::AboutInfo,
+) {
     let badge_style = Style::default()
         .fg(app.theme.color_base())
         .bg(app.theme.color_accent2())
@@ -199,14 +154,12 @@ fn draw_tagline_line(frame: &mut Frame, app: &App, area: Rect, info: &crate::tmp
         .bg(app.theme.color_surface());
 
     let tagline = match app.config.language {
-        Language::Zh => "终端网易云音乐 · 用键盘听歌",
-        Language::En => "NetEase Cloud Music · TUI Player",
+        Language::Zh => "终端网易云音乐播放器",
+        Language::En => "NetEase Cloud Music TUI Player",
     };
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("󰎆 Tune", name_style),
-            Span::styled("  ", Style::default().bg(app.theme.color_surface())),
             Span::styled(format!(" v{} ", info.version), badge_style),
             Span::styled(
                 "  ·  ",
@@ -222,12 +175,16 @@ fn draw_tagline_line(frame: &mut Frame, app: &App, area: Rect, info: &crate::tmp
 }
 
 fn draw_divider_line(frame: &mut Frame, app: &App, area: Rect) {
+    let sep_len = (area.width as usize).saturating_sub(12).max(10);
+    let sep = "─".repeat(sep_len);
     frame.render_widget(
-        Paragraph::new("─".repeat(area.width as usize)).style(
-            Style::default()
-                .fg(app.theme.color_buff())
-                .bg(app.theme.color_surface()),
-        ),
+        Paragraph::new(sep)
+            .style(
+                Style::default()
+                    .fg(app.theme.color_buff())
+                    .bg(app.theme.color_surface()),
+            )
+            .alignment(Alignment::Center),
         area,
     );
 }
@@ -240,52 +197,7 @@ fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
     let info = about_info();
     let max_w = area.width as usize;
     let mut lines: Vec<Line<'static>> = Vec::new();
-    let compact_space = area.height < 11;
-
-    // ── 1. 简介 (Description) ──
-    lines.push(section_header(
-        app,
-        "󰈙",
-        match app.config.language {
-            Language::Zh => "简介",
-            Language::En => "About",
-        },
-    ));
-
-    let description = match app.config.language {
-        Language::Zh => {
-            if info.description.trim().is_empty() {
-                "Tune：终端里的网易云音乐客户端。".to_string()
-            } else {
-                info.description.clone()
-            }
-        }
-        Language::En => {
-            "A modern NetEase Cloud Music TUI player crafted in Rust, featuring lossless streaming, MPRIS integration, and vinyl visualization.".to_string()
-        }
-    };
-    for row in wrap_display_width(&description, max_w.saturating_sub(2)) {
-        lines.push(Line::from(Span::styled(
-            format!("  {row}"),
-            Style::default()
-                .fg(app.theme.color_text())
-                .bg(app.theme.color_surface()),
-        )));
-    }
-
-    if !compact_space {
-        lines.push(blank_line(app));
-    }
-
-    // ── 2. 项目信息 (Specifications) ──
-    lines.push(section_header(
-        app,
-        "󰈀",
-        match app.config.language {
-            Language::Zh => "项目信息",
-            Language::En => "Specifications",
-        },
-    ));
+    let compact_space = area.height < 9;
 
     let author_val = if info.author.is_empty() {
         "Asniya (@aimy1)"
@@ -323,41 +235,42 @@ fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
         ]
     };
 
-    let (v_lbl, a_lbl, l_lbl) = match app.config.language {
-        Language::Zh => ("版本", "作者", "协议"),
-        Language::En => ("Version", "Author", "License"),
+    let (a_lbl, l_lbl) = match app.config.language {
+        Language::Zh => ("作者", "协议"),
+        Language::En => ("Author", "License"),
+    };
+    let repo_lbl = match app.config.language {
+        Language::Zh => "源码",
+        Language::En => "Repo",
+    };
+    let issues_lbl = match app.config.language {
+        Language::Zh => "反馈",
+        Language::En => "Issues",
     };
 
-    if max_w >= 64 {
-        let mut r1_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
-        r1_spans.extend(spec_pill("󰏖", v_lbl, &format!("v{}", info.version)));
-        r1_spans.push(Span::styled("    ", Style::default().bg(app.theme.color_surface())));
+    if !compact_space {
+        lines.push(blank_line(app));
+    }
+
+    if max_w >= 60 {
+        let mut r1_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
         r1_spans.extend(spec_pill("󰑣", a_lbl, author_val));
-        r1_spans.push(Span::styled("    ", Style::default().bg(app.theme.color_surface())));
+        r1_spans.push(Span::styled("            ", Style::default().bg(app.theme.color_surface())));
         r1_spans.extend(spec_pill("󰿃", l_lbl, license_val));
         lines.push(Line::from(r1_spans));
 
-        let repo_lbl = match app.config.language {
-            Language::Zh => "源码",
-            Language::En => "Repo",
-        };
-        let mut r2_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+        let mut r2_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
         r2_spans.extend(spec_pill("󰊤", repo_lbl, "https://github.com/aimy1/tune"));
         lines.push(Line::from(r2_spans));
 
-        let issues_lbl = match app.config.language {
-            Language::Zh => "反馈",
-            Language::En => "Issues",
-        };
-        let mut r3_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+        let mut r3_spans = vec![Span::styled("    ", Style::default().bg(app.theme.color_surface()))];
         r3_spans.extend(spec_pill("󰋼", issues_lbl, "https://github.com/aimy1/tune/issues"));
         lines.push(Line::from(r3_spans));
     } else {
         let items = [
-            ("󰏖", v_lbl, format!("v{}", info.version)),
             ("󰑣", a_lbl, author_val.to_string()),
-            ("󰊤", "源码", "https://github.com/aimy1/tune".to_string()),
-            ("󰋼", "反馈", "https://github.com/aimy1/tune/issues".to_string()),
+            ("󰊤", repo_lbl, "https://github.com/aimy1/tune".to_string()),
+            ("󰋼", issues_lbl, "https://github.com/aimy1/tune/issues".to_string()),
             ("󰿃", l_lbl, license_val.to_string()),
         ];
         for (icon, label, val) in items {
@@ -373,21 +286,12 @@ fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
         lines.push(blank_line(app));
     }
 
-    // ── 3. 技术栈 (Tech Stack) ──
-    lines.push(section_header(
-        app,
-        "󰏖",
-        match app.config.language {
-            Language::Zh => "技术栈",
-            Language::En => "Tech Stack",
-        },
-    ));
-
+    // Centered Tech Stack pills
     let chips = ["Rust 2024", "Ratatui", "Tokio", "Rodio", "MPRIS"];
-    let mut chip_spans = vec![Span::styled("  ", Style::default().bg(app.theme.color_surface()))];
+    let mut chip_spans = Vec::new();
     for (i, chip) in chips.iter().enumerate() {
         if i > 0 {
-            chip_spans.push(Span::styled(" ", Style::default().bg(app.theme.color_surface())));
+            chip_spans.push(Span::styled("  ", Style::default().bg(app.theme.color_surface())));
         }
         chip_spans.push(Span::styled(
             format!(" {chip} "),
@@ -402,6 +306,7 @@ fn draw_content_section(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(
         Paragraph::new(lines)
             .style(Style::default().bg(app.theme.color_surface()))
+            .alignment(if max_w >= 60 { Alignment::Left } else { Alignment::Left })
             .wrap(Wrap { trim: false }),
         area,
     );
@@ -413,18 +318,12 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
     }
 
     let text = match app.config.language {
-        Language::Zh => "为终端音乐爱好者打造 · 欢迎 Star / Issue 反馈",
-        Language::En => "Crafted for terminal music lovers · Stars & Issues welcome",
+        Language::Zh => "Esc / q  返回",
+        Language::En => "Esc / q  to return",
     };
 
     frame.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled(
-                "󰓎 ",
-                Style::default()
-                    .fg(app.theme.color_accent3())
-                    .bg(app.theme.color_surface()),
-            ),
             Span::styled(
                 text,
                 Style::default()
@@ -435,25 +334,6 @@ fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
         .alignment(Alignment::Center),
         area,
     );
-}
-
-fn section_header(app: &App, icon: &str, title: &str) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(
-            format!("{icon} "),
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .bg(app.theme.color_surface())
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            title.to_string(),
-            Style::default()
-                .fg(app.theme.color_accent2())
-                .bg(app.theme.color_surface())
-                .add_modifier(Modifier::BOLD),
-        ),
-    ])
 }
 
 fn blank_line(app: &App) -> Line<'static> {
@@ -470,8 +350,8 @@ fn surface_style(app: &App) -> Style {
 }
 
 fn modal_area(size: Rect) -> Rect {
-    let want_w = 76u16;
-    let want_h = 22u16;
+    let want_w = 68u16;
+    let want_h = 19u16;
 
     let max_w = size.width.saturating_sub(2);
     let max_h = size.height.saturating_sub(1);
@@ -489,37 +369,6 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
         width: w,
         height: h,
     }
-}
-
-fn wrap_display_width(text: &str, max_width: usize) -> Vec<String> {
-    if max_width == 0 {
-        return Vec::new();
-    }
-    if text.is_empty() {
-        return vec![String::new()];
-    }
-
-    let mut out = Vec::new();
-    let mut buf = String::new();
-    let mut used = 0usize;
-    for ch in text.chars() {
-        if ch == '\n' {
-            out.push(std::mem::take(&mut buf));
-            used = 0;
-            continue;
-        }
-        let w = ch.width().unwrap_or(0);
-        if used + w > max_width && !buf.is_empty() {
-            out.push(std::mem::take(&mut buf));
-            used = 0;
-        }
-        buf.push(ch);
-        used += w;
-    }
-    if !buf.is_empty() {
-        out.push(buf);
-    }
-    out
 }
 
 fn clip_to_display_width(text: &str, max_width: usize) -> String {
