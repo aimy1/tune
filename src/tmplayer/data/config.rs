@@ -35,6 +35,9 @@ pub struct Config {
     #[serde(default)]
     pub page_lyrics: bool,
 
+    #[serde(default)]
+    pub desktop_lyrics: bool,
+
     #[serde(default = "default_kitty_cover_scale_percent")]
     pub kitty_cover_scale_percent: u8,
 
@@ -139,6 +142,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_home")]
     pub keybind_home: String,
+
+    #[serde(default = "default_keybind_desktop_lyrics")]
+    pub keybind_desktop_lyrics: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -376,6 +382,10 @@ fn default_keybind_home() -> String {
     "X".to_string()
 }
 
+fn default_keybind_desktop_lyrics() -> String {
+    "Alt+D".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -389,6 +399,7 @@ impl Default for Config {
             album_border: default_album_border(),
             graphics_protocol: GraphicsProtocol::default(),
             page_lyrics: false,
+            desktop_lyrics: false,
             kitty_cover_scale_percent: default_kitty_cover_scale_percent(),
             super_smooth_bar: false,
             bars_gap: false,
@@ -424,6 +435,7 @@ impl Default for Config {
             keybind_toggle_like_collapsed: default_keybind_toggle_like_collapsed(),
             keybind_personal_center: default_keybind_personal_center(),
             keybind_home: default_keybind_home(),
+            keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
         }
     }
 }
@@ -470,6 +482,7 @@ impl Config {
             || !raw.contains("playback_memory")
             || !raw.contains("transparent_sidebar")
             || !raw.contains("page_lyrics")
+            || !raw.contains("desktop_lyrics")
             || !raw.contains("show_hints")
             || !raw.contains("home_more_recommend")
             || !raw.contains("keybind_search_box")

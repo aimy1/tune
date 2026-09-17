@@ -1,11 +1,13 @@
 mod api;
 mod api_parsers;
+pub(crate) mod desktop_lyrics;
 pub(crate) mod keybinds;
 mod mpris_bridge;
 pub(crate) mod player;
 pub(crate) mod streaming;
 
 use api_parsers::*;
+use desktop_lyrics::{DesktopLyricPayload, DesktopLyricsManager};
 use keybinds::*;
 
 use crate::data::config::{AudioQuality, BarChannels, Language};
@@ -60,8 +62,8 @@ const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 10;
-const SETTINGS_PLAYBACK_ITEMS: usize = 10;
-pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 19;
+const SETTINGS_PLAYBACK_ITEMS: usize = 11;
+pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 20;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
 const STARTUP_LOADING_MIN_VISIBLE_SECS: f32 = 0.75;
@@ -1680,6 +1682,7 @@ pub struct App {
     pub pre_mute_volume: Option<f32>,
     system_volume: Option<crate::tmplayer::utils::system_volume::SystemVolume>,
     pub graphics_picker: Picker,
+    pub desktop_lyrics_manager: DesktopLyricsManager,
 }
 
 impl App {
@@ -1714,6 +1717,7 @@ impl App {
         let cache_root = resolve_cache_root(&config);
         let cover_cache_dir = cache_root.join(COVER_CACHE_SUBDIR);
         let mpris_bridge = MprisBridge::new(&cache_root, &config.cache);
+        let desktop_lyrics_manager = DesktopLyricsManager::new(&cache_root);
         if config.cache.clean_on_startup {
             let _ = cleanup_cache_dir(&cover_cache_dir, &config.cache);
         }
@@ -1802,6 +1806,7 @@ impl App {
             pre_mute_volume: None,
             system_volume,
             graphics_picker: Picker::halfblocks(),
+            desktop_lyrics_manager,
         };
 
         if Picker::from_query_stdio().is_ok() {
@@ -1848,6 +1853,7 @@ impl App {
         self.tick_lyric_fetch();
         self.apply_mpris_control_events().await;
         self.sync_mpris_exposure();
+        self.sync_desktop_lyrics();
         self.tick_main_cava();
         self.tick_search_box_animation();
         self.tick_home_sidebar_animation();
@@ -2368,6 +2374,7 @@ impl App {
         self.tick_lyric_fetch();
         self.apply_mpris_control_events().await;
         self.sync_mpris_exposure();
+        self.sync_desktop_lyrics();
     }
 
     async fn apply_mpris_control_events(&mut self) {
@@ -2469,6 +2476,51 @@ impl App {
         if metadata_changed {
             self.mpris_last_signature = Some(signature);
         }
+    }
+
+    pub fn sync_desktop_lyrics(&mut self) {
+        let enabled = self.config.desktop_lyrics;
+        let (line1, line2) = self.current_page_lyric_lines();
+        let (title, artist) = if let Some(track) = self.now_playing.as_ref() {
+            (track.title.clone(), track.artist.clone())
+        } else {
+            (String::new(), String::new())
+        };
+        let state = match self.playback_state {
+            PlaybackRuntimeState::Playing => "Playing",
+            PlaybackRuntimeState::Paused => "Paused",
+            PlaybackRuntimeState::Stopped => "Stopped",
+        };
+
+        let accent_rgb = self.theme.palette.accent;
+        let subtext_rgb = self.theme.palette.subtext;
+        let accent_hex = format!("#{:02x}{:02x}{:02x}", accent_rgb.0, accent_rgb.1, accent_rgb.2);
+        let subtext_hex = format!("#{:02x}{:02x}{:02x}", subtext_rgb.0, subtext_rgb.1, subtext_rgb.2);
+
+        let payload = DesktopLyricPayload {
+            title,
+            artist,
+            line1,
+            line2,
+            state: state.to_string(),
+            accent_color: accent_hex,
+            subtext_color: subtext_hex,
+        };
+
+        self.desktop_lyrics_manager.sync(enabled, payload);
+    }
+
+    pub fn toggle_desktop_lyrics(&mut self) {
+        self.config.desktop_lyrics = !self.config.desktop_lyrics;
+        let _ = self.config.save();
+        let msg = match (self.config.language, self.config.desktop_lyrics) {
+            (Language::Zh, true) => "桌面歌词已开启",
+            (Language::Zh, false) => "桌面歌词已关闭",
+            (Language::En, true) => "Desktop lyrics enabled",
+            (Language::En, false) => "Desktop lyrics disabled",
+        };
+        self.set_runtime_status(msg);
+        self.sync_desktop_lyrics();
     }
 
     pub fn fullscreen_playback_snapshot(&self) -> FullscreenPlaybackSnapshot {
@@ -2752,6 +2804,7 @@ impl App {
             }
             KeybindAction::PersonalCenter => self.open_personal_center_page().await,
             KeybindAction::Home => self.go_to_home_page(),
+            KeybindAction::DesktopLyrics => self.toggle_desktop_lyrics(),
         }
     }
 
@@ -2869,6 +2922,7 @@ impl App {
             KeybindAction::ToggleLikeCollapsed,
             KeybindAction::PersonalCenter,
             KeybindAction::Home,
+            KeybindAction::DesktopLyrics,
         ];
 
         actions
@@ -2899,6 +2953,7 @@ impl App {
             KeybindAction::ToggleLikeCollapsed => &self.config.keybind_toggle_like_collapsed,
             KeybindAction::PersonalCenter => &self.config.keybind_personal_center,
             KeybindAction::Home => &self.config.keybind_home,
+            KeybindAction::DesktopLyrics => &self.config.keybind_desktop_lyrics,
         }
     }
 
@@ -2923,6 +2978,7 @@ impl App {
             16 => Some(&mut self.config.keybind_toggle_like_collapsed),
             17 => Some(&mut self.config.keybind_personal_center),
             18 => Some(&mut self.config.keybind_home),
+            19 => Some(&mut self.config.keybind_desktop_lyrics),
             _ => None,
         }
     }
@@ -2948,6 +3004,7 @@ impl App {
             16 => Some(self.config.keybind_toggle_like_collapsed.as_str()),
             17 => Some(self.config.keybind_personal_center.as_str()),
             18 => Some(self.config.keybind_home.as_str()),
+            19 => Some(self.config.keybind_desktop_lyrics.as_str()),
             _ => None,
         }
     }
@@ -2992,6 +3049,7 @@ impl App {
             16 => self.lang_text("折叠栏收藏/取消收藏", "Collapsed Like/Unlike"),
             17 => self.lang_text("个人主页/个人中心", "Personal Center"),
             18 => self.lang_text("进入首页", "Home"),
+            19 => self.lang_text("桌面歌词", "Desktop Lyrics"),
             _ => self.lang_text("未知", "Unknown"),
         }
     }
@@ -3020,6 +3078,7 @@ impl App {
             DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED.to_string();
         self.config.keybind_personal_center = DEFAULT_KEYBIND_PERSONAL_CENTER.to_string();
         self.config.keybind_home = DEFAULT_KEYBIND_HOME.to_string();
+        self.config.keybind_desktop_lyrics = DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string();
     }
 
     pub fn keybind_label_for_index(&self, index: usize) -> String {
@@ -3043,6 +3102,7 @@ impl App {
             16 => KeybindAction::ToggleLikeCollapsed,
             17 => KeybindAction::PersonalCenter,
             18 => KeybindAction::Home,
+            19 => KeybindAction::DesktopLyrics,
             _ => KeybindAction::SearchBox,
         });
         format!("{}: {}", self.keybind_name_for_index(index), value)
@@ -4519,13 +4579,16 @@ impl App {
                 let _ = self.config.save();
             }
             7 => {
+                self.toggle_desktop_lyrics();
+            }
+            8 => {
                 let next = self
                     .config
                     .audio_quality
                     .cycle(delta, self.vip_audio_unlocked);
                 self.set_audio_quality(next);
             }
-            8 => {
+            9 => {
                 self.config.playback_memory = !self.config.playback_memory;
                 let _ = self.config.save();
                 if self.config.playback_memory {
@@ -4534,7 +4597,7 @@ impl App {
                     self.clear_playback_memory();
                 }
             }
-            9 => {
+            10 => {
                 self.config.transparent_sidebar = !self.config.transparent_sidebar;
                 let _ = self.config.save();
             }
@@ -5038,6 +5101,7 @@ impl App {
             language: self.config.language,
             graphics_protocol: self.config.graphics_protocol,
             page_lyrics: self.config.page_lyrics,
+            desktop_lyrics: self.config.desktop_lyrics,
             audio_quality: self.config.audio_quality,
             eq_bands_db: self.config.eq_bands_db,
             playback_memory: self.config.playback_memory,
@@ -5088,6 +5152,12 @@ impl App {
 
         if self.config.page_lyrics != sync.page_lyrics {
             self.config.page_lyrics = sync.page_lyrics;
+            changed = true;
+        }
+
+        if self.config.desktop_lyrics != sync.desktop_lyrics {
+            self.config.desktop_lyrics = sync.desktop_lyrics;
+            self.sync_desktop_lyrics();
             changed = true;
         }
 

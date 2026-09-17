@@ -203,6 +203,10 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             on_off(app, app.config.page_lyrics).to_string()
         ),
         (
+            l(app, "桌面歌词", "Desktop Lyrics"),
+            on_off(app, app.config.desktop_lyrics).to_string()
+        ),
+        (
             l(app, "音质", "Audio Quality"),
             audio_quality_label(app, app.config.audio_quality).to_string()
         ),

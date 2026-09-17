@@ -623,6 +623,10 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
             lang_on_off(app, app.config.page_lyrics).to_string(),
         ),
         (
+            lang_text(app, "桌面歌词", "Desktop Lyrics"),
+            lang_on_off(app, app.config.desktop_lyrics).to_string(),
+        ),
+        (
             lang_text(app, "音质", "Audio Quality"),
             match app.config.audio_quality {
                 crate::tmplayer::data::config::AudioQuality::Standard => {
@@ -1169,6 +1173,10 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
         (
             lang_text(app, "侧边栏歌单区切换", "Sidebar Playlist Section Switch"),
             "Ctrl+Up/Down",
+        ),
+        (
+            lang_text(app, "桌面歌词", "Desktop Lyrics"),
+            app.config.keybind_desktop_lyrics.as_str(),
         ),
         (lang_text(app, "按键绑定", "Keybinds"), "Ctrl+K"),
     ];

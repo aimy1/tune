@@ -18,6 +18,7 @@ pub enum Action {
     CloseOverlay,
 
     OpenSettingsModal,
+    ToggleDesktopLyrics,
     OpenHelpModal,
     OpenVolumeModal,
     ToggleMute,
@@ -232,6 +233,10 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     if keybind_matches(&config.keybind_home, ev) {
         return Action::OpenHome;
+    }
+
+    if keybind_matches(&config.keybind_desktop_lyrics, ev) {
+        return Action::ToggleDesktopLyrics;
     }
 
     if keybind_matches(&config.keybind_search_box, ev) {

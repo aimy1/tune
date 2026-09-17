@@ -24,7 +24,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::time::{Duration, Instant};
 
-const HELP_MODAL_ITEMS: usize = 14;
+const HELP_MODAL_ITEMS: usize = 15;
 
 fn sync_playlists_when_viewing_playback(app: &mut AppState) {
     if app.local_view_album_folder.is_some() && app.local_folder.is_some() {
@@ -147,6 +147,7 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
         language: app.language,
         graphics_protocol: app.config.graphics_protocol,
         page_lyrics: app.config.page_lyrics,
+        desktop_lyrics: app.config.desktop_lyrics,
         audio_quality: match app.config.audio_quality {
             AudioQuality::Standard => crate::data::config::AudioQuality::Standard,
             AudioQuality::Higher => crate::data::config::AudioQuality::Higher,
@@ -981,6 +982,10 @@ async fn handle_action(
         Action::OpenHome => {
             app.request_host_exit = Some(crate::tmplayer::FullscreenExit::BackToHostOpenHome);
         }
+        Action::ToggleDesktopLyrics => {
+            app.config.desktop_lyrics = !app.config.desktop_lyrics;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
         Action::SeekDelta(delta) => {
             let pos = app.player.position;
             let dur = app.player.track.duration;
@@ -1227,15 +1232,19 @@ async fn handle_action(
                     save_and_sync_host_config(app, host_bridge).await;
                 }
                 7 => {
+                    app.config.desktop_lyrics = !app.config.desktop_lyrics;
+                    save_and_sync_host_config(app, host_bridge).await;
+                }
+                8 => {
                     app.config.audio_quality =
                         app.config.audio_quality.cycle(1, app.vip_audio_unlocked);
                     save_and_sync_host_config(app, host_bridge).await;
                 }
-                8 => {
+                9 => {
                     app.config.playback_memory = !app.config.playback_memory;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
-                9 => {
+                10 => {
                     app.config.transparent_sidebar = !app.config.transparent_sidebar;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
@@ -1407,7 +1416,7 @@ async fn handle_action(
                     app.settings_selected -= 1;
                 }
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 10;
+                let count = 11;
                 if app.bar_settings_selected == 0 {
                     app.bar_settings_selected = count - 1;
                 } else {
@@ -1440,7 +1449,7 @@ async fn handle_action(
                 let count = 10;
                 app.settings_selected = (app.settings_selected + 1) % count;
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 10;
+                let count = 11;
                 app.bar_settings_selected = (app.bar_settings_selected + 1) % count;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 let count = 5;
@@ -1492,15 +1501,19 @@ async fn handle_action(
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     7 => {
+                        app.config.desktop_lyrics = !app.config.desktop_lyrics;
+                        save_and_sync_host_config(app, host_bridge).await;
+                    }
+                    8 => {
                         app.config.audio_quality =
                             app.config.audio_quality.cycle(-1, app.vip_audio_unlocked);
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    8 => {
+                    9 => {
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    9 => {
+                    10 => {
                         app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
@@ -1553,15 +1566,19 @@ async fn handle_action(
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     7 => {
+                        app.config.desktop_lyrics = !app.config.desktop_lyrics;
+                        save_and_sync_host_config(app, host_bridge).await;
+                    }
+                    8 => {
                         app.config.audio_quality =
                             app.config.audio_quality.cycle(1, app.vip_audio_unlocked);
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    8 => {
+                    9 => {
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    9 => {
+                    10 => {
                         app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }

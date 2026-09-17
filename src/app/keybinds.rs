@@ -19,6 +19,7 @@ pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ: &str = "E";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ_RESET: &str = "Alt+R";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN: &str = "L";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED: &str = "Alt+L";
+pub(crate) const DEFAULT_KEYBIND_DESKTOP_LYRICS: &str = "Alt+D";
 #[allow(dead_code)]
 pub(crate) const DEFAULT_KEYBIND_PERSONAL_CENTER: &str = "Z";
 pub(crate) const DEFAULT_KEYBIND_HOME: &str = "X";
@@ -42,6 +43,7 @@ pub enum KeybindAction {
     FullscreenEqReset,
     ToggleLikeFullscreen,
     ToggleLikeCollapsed,
+    DesktopLyrics,
     PersonalCenter,
     Home,
 }
@@ -264,5 +266,24 @@ mod tests {
             state: crossterm::event::KeyEventState::empty(),
         };
         assert!(keybind_matches(DEFAULT_KEYBIND_HOME, ev_caps));
+    }
+
+    #[test]
+    fn test_desktop_lyrics_keybind_matches() {
+        let ev = KeyEvent {
+            code: KeyCode::Char('d'),
+            modifiers: KeyModifiers::ALT,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert!(keybind_matches(DEFAULT_KEYBIND_DESKTOP_LYRICS, ev));
+
+        let ev_upper = KeyEvent {
+            code: KeyCode::Char('D'),
+            modifiers: KeyModifiers::ALT,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert!(keybind_matches(DEFAULT_KEYBIND_DESKTOP_LYRICS, ev_upper));
     }
 }

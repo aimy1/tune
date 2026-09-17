@@ -106,6 +106,7 @@ pub struct HostConfigSync {
     pub language: HostLanguage,
     pub graphics_protocol: GraphicsProtocol,
     pub page_lyrics: bool,
+    pub desktop_lyrics: bool,
     pub audio_quality: HostAudioQuality,
     pub eq_bands_db: [f32; crate::tmplayer::app::state::EQ_BANDS],
     pub playback_memory: bool,
@@ -183,6 +184,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         eq_bands_db: host.eq_bands_db,
         transparent_background: host.transparent_background,
         page_lyrics: host.page_lyrics,
+        desktop_lyrics: host.desktop_lyrics,
         album_border: host.album_border,
         graphics_protocol: host.graphics_protocol,
         kitty_cover_scale_percent: host.kitty_cover_scale_percent,
@@ -242,6 +244,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         keybind_toggle_like_collapsed: host.keybind_toggle_like_collapsed.clone(),
         keybind_personal_center: host.keybind_personal_center.clone(),
         keybind_home: host.keybind_home.clone(),
+        keybind_desktop_lyrics: host.keybind_desktop_lyrics.clone(),
     }
 }
 

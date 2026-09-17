@@ -116,6 +116,9 @@ pub struct Config {
     #[serde(default = "default_page_lyrics")]
     pub page_lyrics: bool,
 
+    #[serde(default)]
+    pub desktop_lyrics: bool,
+
     #[serde(default = "default_audio_quality")]
     pub audio_quality: AudioQuality,
 
@@ -193,6 +196,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_home")]
     pub keybind_home: String,
+
+    #[serde(default = "default_keybind_desktop_lyrics")]
+    pub keybind_desktop_lyrics: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -514,6 +520,10 @@ fn default_keybind_home() -> String {
     "X".to_string()
 }
 
+fn default_keybind_desktop_lyrics() -> String {
+    crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -540,6 +550,7 @@ impl Default for Config {
             default_opening_title: String::new(),
             language: default_language(),
             page_lyrics: default_page_lyrics(),
+            desktop_lyrics: false,
             audio_quality: default_audio_quality(),
             playback_memory: false,
             transparent_sidebar: false,
@@ -566,6 +577,7 @@ impl Default for Config {
             keybind_toggle_like_collapsed: default_keybind_toggle_like_collapsed(),
             keybind_personal_center: default_keybind_personal_center(),
             keybind_home: default_keybind_home(),
+            keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
         }
     }
 }
@@ -608,6 +620,7 @@ impl Config {
         if !raw.contains("default_opening_title")
             || !raw.contains("language")
             || !raw.contains("page_lyrics")
+            || !raw.contains("desktop_lyrics")
             || !raw.contains("eq_bands_db")
             || !raw.contains("audio_quality")
             || !raw.contains("playback_memory")
