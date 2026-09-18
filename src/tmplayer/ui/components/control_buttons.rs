@@ -32,8 +32,8 @@ fn get_control_strings(app: &AppState) -> (&'static str, String, &'static str, S
     let s_mode = format!("{repeat_symbol}  ");
     let s_vol = format!("[{vol_icon} {vol_pct}%]");
     let lyrics_text = match app.language {
-        crate::data::config::Language::Zh => "󰎆 词",
-        crate::data::config::Language::En => "󰎆 LRC",
+        crate::data::config::Language::Zh => "词",
+        crate::data::config::Language::En => "LRC",
     };
     let s_lyrics = format!("[{lyrics_text}]");
 
@@ -161,8 +161,8 @@ pub fn render(f: &mut Frame, area: Rect, app: &AppState) {
     spans.push(Span::raw("  "));
 
     let lyrics_text = match app.language {
-        crate::data::config::Language::Zh => "󰎆 词",
-        crate::data::config::Language::En => "󰎆 LRC",
+        crate::data::config::Language::Zh => "词",
+        crate::data::config::Language::En => "LRC",
     };
     if app.config.desktop_lyrics {
         spans.push(Span::styled("[", Style::default().fg(app.theme.color_subtext())));

@@ -82,8 +82,8 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let is_desktop_lyrics_active = app.config.desktop_lyrics;
     let dlyric_text = match app.config.language {
-        crate::data::config::Language::Zh => "󰎆 词",
-        crate::data::config::Language::En => "󰎆 LRC",
+        crate::data::config::Language::Zh => "词",
+        crate::data::config::Language::En => "LRC",
     };
     let dlyric_label = format!("[{dlyric_text}]");
     let dlyric_w = display_width(&dlyric_label) as u16;
