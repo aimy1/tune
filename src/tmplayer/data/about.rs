@@ -43,6 +43,41 @@ pub fn about_info() -> &'static AboutInfo {
     })
 }
 
+pub fn select_logo_art<'a>(
+    width: usize,
+    height: usize,
+    arts: &'a [BrailleImage],
+) -> Option<&'a BrailleImage> {
+    let mut best_fit: Option<(&'a BrailleImage, u128)> = None;
+    for art in arts {
+        if art.width == 0 || art.height == 0 {
+            continue;
+        }
+        if art.width <= width && art.height <= height {
+            let score = (art.width as u128) * (art.height as u128);
+            let should_replace = best_fit
+                .as_ref()
+                .map(|(_, best_score)| score > *best_score)
+                .unwrap_or(true);
+            if should_replace {
+                best_fit = Some((art, score));
+            }
+        }
+    }
+
+    if let Some((art, _)) = best_fit {
+        return Some(art);
+    }
+
+    arts.iter()
+        .filter(|art| art.width > 0 && art.height > 0)
+        .min_by_key(|art| {
+            let dw = art.width.saturating_sub(width);
+            let dh = art.height.saturating_sub(height);
+            dw * dw + dh * dh
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

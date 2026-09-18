@@ -1,3 +1,4 @@
+use crate::data::config::Language;
 use crate::tmplayer::app::state::{AppState, Overlay};
 use crate::tmplayer::render::graphics_overlay::GraphicsOverlay;
 use crate::tmplayer::ui::components::control_buttons;
@@ -990,165 +991,184 @@ fn render_local_audio_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &m
 }
 
 fn render_about_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
-    let area = centered_rect(size, 70, 22);
+    if size.width < 32 || size.height < 10 {
+        render_about_compact(f, size, app);
+        return;
+    }
+
+    let area = about_modal_area(size);
     f.render_widget(ratatui::widgets::Clear, area);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(ratatui::widgets::BorderType::Rounded)
-        .title(lang_text(app, " 关于 ", " About "))
-        .border_style(
-            Style::default()
-                .fg(app.theme.color_accent())
-                .add_modifier(Modifier::BOLD),
-        )
-        .style(base_bg_style(app));
-    f.render_widget(block, area);
+    // Clean border with NO text on borders
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(
+                Style::default()
+                    .fg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD),
+            )
+            .style(
+                Style::default()
+                    .fg(app.theme.color_subtext())
+                    .bg(app.theme.color_surface()),
+            ),
+        area,
+    );
+
+    let inner = area.inner(ratatui::layout::Margin {
+        horizontal: 2,
+        vertical: 1,
+    });
+    render_about_content(f, inner, app);
+}
+
+fn render_about_compact(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
+    let area = about_compact_area(size);
+    f.render_widget(ratatui::widgets::Clear, area);
+
+    // Clean border with NO text on borders
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(
+                Style::default()
+                    .fg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD),
+            )
+            .style(
+                Style::default()
+                    .fg(app.theme.color_subtext())
+                    .bg(app.theme.color_surface()),
+            ),
+        area,
+    );
 
     let inner = area.inner(ratatui::layout::Margin {
         horizontal: 1,
         vertical: 1,
     });
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
-        .split(inner);
-
-    render_about_braille(f, chunks[0], app);
-    render_about_text(f, chunks[1], app);
-
-    let info = crate::tmplayer::data::about::about_info();
-    let version = format!("v{}", info.version);
-    let y = area.y + area.height.saturating_sub(1);
-    let version_area = Rect {
-        x: area.x.saturating_add(1),
-        y,
-        width: area.width.saturating_sub(2),
-        height: 1,
-    };
-    f.render_widget(
-        Paragraph::new(version).alignment(Alignment::Center).style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        ),
-        version_area,
-    );
+    render_about_content(f, inner, app);
 }
 
-fn render_about_braille(f: &mut ratatui::Frame, area: Rect, app: &mut AppState) {
+fn render_about_content(f: &mut ratatui::Frame, area: Rect, app: &AppState) {
     if area.width == 0 || area.height == 0 {
         return;
     }
-    let lines = about_braille_lines(area.width as usize, area.height as usize);
-    let p = Paragraph::new(lines).style(
+
+    let info = crate::tmplayer::data::about::about_info();
+    let mut lines: Vec<Line<'static>> = Vec::new();
+
+    // 1. Logo Art (if height allows)
+    let show_art = area.height >= 9 && area.width >= 26;
+    if show_art {
+        let max_logo_h = if area.height >= 12 && area.width >= 48 {
+            6
+        } else if area.height >= 10 && area.width >= 38 {
+            5
+        } else {
+            4
+        };
+        let logo_lines = about_logo_lines(app, area.width as usize, max_logo_h);
+        lines.extend(logo_lines);
+        lines.push(blank_about_line(app));
+    }
+
+    // 2. Version
+    let badge_style = Style::default()
+        .fg(app.theme.color_base())
+        .bg(app.theme.color_accent2())
+        .add_modifier(Modifier::BOLD);
+    lines.push(Line::from(vec![
+        Span::styled(format!(" 󰎆 v{} ", info.version), badge_style),
+    ]));
+
+    // 3. Tagline & Author
+    let author = if info.author.is_empty() {
+        "Asniya (@aimy1)"
+    } else {
+        info.author.as_str()
+    };
+    let tagline = match app.language {
+        Language::Zh => format!("终端网易云音乐 · By {author}"),
+        Language::En => format!("NetEase Cloud Music TUI Player · By {author}"),
+    };
+    lines.push(Line::from(Span::styled(
+        tagline,
+        Style::default()
+            .fg(app.theme.color_text())
+            .add_modifier(Modifier::BOLD),
+    )));
+
+    // 4. Repo Link
+    let repo_url = info
+        .links
+        .get("github_url")
+        .map(|s| s.as_str())
+        .unwrap_or("https://github.com/aimy1/tune");
+    lines.push(Line::from(Span::styled(
+        repo_url.to_string(),
         Style::default()
             .fg(app.theme.color_accent())
-            .bg(app.theme.color_surface())
-            .add_modifier(Modifier::BOLD),
+            .add_modifier(Modifier::UNDERLINED),
+    )));
+
+    // 5. Exit Hint
+    if area.height as usize > lines.len() + 1 {
+        lines.push(blank_about_line(app));
+    }
+    let exit_hint = match app.language {
+        Language::Zh => "Esc / q  返回",
+        Language::En => "Esc / q  Back",
+    };
+    lines.push(Line::from(Span::styled(
+        exit_hint,
+        Style::default().fg(app.theme.color_subtext()),
+    )));
+
+    f.render_widget(
+        Paragraph::new(lines)
+            .style(Style::default().bg(app.theme.color_surface()))
+            .alignment(Alignment::Center),
+        area,
     );
-    f.render_widget(p, area);
 }
 
-fn render_about_text(f: &mut ratatui::Frame, area: Rect, app: &mut AppState) {
-    if area.width == 0 || area.height == 0 {
-        return;
-    }
-    let info = crate::tmplayer::data::about::about_info();
-
-    let max_width = area.width as usize;
-    if max_width == 0 {
-        return;
-    }
-
-    let mut rendered: Vec<String> = Vec::new();
-    for (k, v) in &info.links {
-        let line = if k.eq_ignore_ascii_case("github_url") || k.eq_ignore_ascii_case("github") {
-            format!("GitHub: {}", v)
-        } else if k.eq_ignore_ascii_case("issues_url") || k.eq_ignore_ascii_case("issues") {
-            format!("Issues: {}", v)
-        } else {
-            format!("{}: {}", k, v)
-        };
-        rendered.extend(wrap_text(&line, max_width));
-    }
-
-    let desc_lines: Vec<String> = wrap_text(&info.description, max_width);
-    if !desc_lines.is_empty() {
-        rendered.push(String::new());
-        rendered.extend(desc_lines);
-    }
-
-    let max_line_len = rendered
-        .iter()
-        .map(|l| l.chars().count())
-        .max()
-        .unwrap_or(0)
-        .min(max_width);
-    let block_h = rendered.len() as u16;
-    let block_w = max_line_len.max(1) as u16;
-    let offset_x = (area.width.saturating_sub(block_w)) / 2;
-    let offset_y = if block_h <= area.height {
-        (area.height.saturating_sub(block_h)) / 2
-    } else {
-        0
-    };
-
-    let lines: Vec<Line> = rendered
-        .into_iter()
-        .map(|l| {
-            Line::styled(
-                l,
-                Style::default()
-                    .fg(app.theme.color_text())
-                    .bg(app.theme.color_surface()),
-            )
-        })
-        .collect();
-    let p = Paragraph::new(lines)
-        .style(Style::default().bg(app.theme.color_surface()))
-        .wrap(Wrap { trim: false });
-    let text_h = area.height.saturating_sub(offset_y).min(block_h.max(1));
-    let text_area = Rect {
-        x: area.x + offset_x,
-        y: area.y + offset_y,
-        width: block_w,
-        height: text_h,
-    };
-    f.render_widget(p, text_area);
+fn blank_about_line(app: &AppState) -> Line<'static> {
+    Line::from(Span::styled(
+        " ",
+        Style::default().bg(app.theme.color_surface()),
+    ))
 }
 
-fn wrap_text(s: &str, width: usize) -> Vec<String> {
-    if width == 0 {
-        return Vec::new();
-    }
-    if s.is_empty() {
-        return vec![String::new()];
-    }
+fn about_modal_area(size: Rect) -> Rect {
+    let want_w = 58u16;
+    let want_h = 16u16;
 
-    let mut out: Vec<String> = Vec::new();
-    let mut buf = String::new();
-    for ch in s.chars() {
-        if buf.chars().count() >= width {
-            out.push(buf);
-            buf = String::new();
-        }
-        buf.push(ch);
-    }
-    if !buf.is_empty() {
-        out.push(buf);
-    }
-    out
+    let max_w = size.width.saturating_sub(2);
+    let max_h = size.height.saturating_sub(1);
+    let w = want_w.min(max_w).max(32.min(max_w));
+    let h = want_h.min(max_h).max(10.min(max_h));
+    centered_rect(size, w, h)
 }
 
-fn about_braille_lines(width: usize, height: usize) -> Vec<Line<'static>> {
+fn about_compact_area(size: Rect) -> Rect {
+    let w = size.width.saturating_sub(2).max(20);
+    let h = size.height.saturating_sub(2).max(8);
+    centered_rect(size, w, h)
+}
+
+/// Center the logo in the panel; if the panel is smaller, crop from the center.
+fn about_logo_lines(app: &AppState, width: usize, height: usize) -> Vec<Line<'static>> {
     let blank = " ".repeat(width);
     if width == 0 || height == 0 {
         return Vec::new();
     }
 
     let info = crate::tmplayer::data::about::about_info();
-    let Some(selected) = select_about_braille_art(width, height, &info.braille_images) else {
+    let Some(selected) = crate::tmplayer::data::about::select_logo_art(width, height, &info.braille_images) else {
         return (0..height).map(|_| Line::from(blank.clone())).collect();
     };
 
@@ -1168,72 +1188,72 @@ fn about_braille_lines(width: usize, height: usize) -> Vec<Line<'static>> {
     }
     rows = rows[start..end].to_vec();
 
-    let rows_w = rows
+    let art_h = rows.len();
+    let art_w = rows
         .iter()
         .map(|line| line.chars().count())
         .max()
         .unwrap_or(0);
-    let canvas_w = selected.width.max(rows_w);
-    let canvas_h = selected.height.max(rows.len());
 
-    let offset_x = width.saturating_sub(canvas_w) / 2;
-    let offset_y = height.saturating_sub(canvas_h) / 2;
+    let (src_y0, dst_y0, copy_h) = if art_h <= height {
+        (0, (height - art_h) / 2, art_h)
+    } else {
+        ((art_h - height) / 2, 0, height)
+    };
+    let (src_x0, dst_x0, copy_w) = if art_w <= width {
+        (0, (width - art_w) / 2, art_w)
+    } else {
+        ((art_w - width) / 2, 0, width)
+    };
+
     let mut grid: Vec<Vec<char>> = vec![vec![' '; width]; height];
-
-    for (row_idx, row) in rows.iter().enumerate() {
-        let gy = offset_y + row_idx;
-        if gy >= height {
-            break;
-        }
-        for (col_idx, ch) in row.chars().enumerate() {
-            let gx = offset_x + col_idx;
-            if gx >= width {
-                break;
+    for row_i in 0..copy_h {
+        let src_row = &rows[src_y0 + row_i];
+        let src_chars: Vec<char> = src_row.chars().collect();
+        let gy = dst_y0 + row_i;
+        for col_i in 0..copy_w {
+            let sx = src_x0 + col_i;
+            let gx = dst_x0 + col_i;
+            if sx < src_chars.len() {
+                grid[gy][gx] = src_chars[sx];
             }
-            grid[gy][gx] = ch;
         }
     }
+
+    let total_rows = grid.len();
+    let c1 = app.theme.palette.accent;
+    let c2 = app.theme.palette.accent2;
 
     grid.into_iter()
-        .map(|row| Line::from(row.into_iter().collect::<String>()))
-        .collect()
-}
-
-fn select_about_braille_art(
-    width: usize,
-    height: usize,
-    arts: &[crate::tmplayer::data::about::BrailleImage],
-) -> Option<&crate::tmplayer::data::about::BrailleImage> {
-    let mut best_fit: Option<(&crate::tmplayer::data::about::BrailleImage, u128)> = None;
-    for art in arts {
-        if art.width == 0 || art.height == 0 {
-            continue;
-        }
-        if art.width <= width && art.height <= height {
-            let score = (art.width as u128) * (art.height as u128);
-            let should_replace = best_fit
-                .as_ref()
-                .map(|(_, best_score)| score > *best_score)
-                .unwrap_or(true);
-            if should_replace {
-                best_fit = Some((art, score));
-            }
-        }
-    }
-
-    if let Some((art, _)) = best_fit {
-        return Some(art);
-    }
-
-    arts.iter()
-        .filter(|art| art.width > 0 && art.height > 0)
-        .min_by_key(|art| {
-            let dw = art.width.saturating_sub(width) as u128;
-            let dh = art.height.saturating_sub(height) as u128;
-            let overflow = dw.saturating_mul(dh).saturating_add(dw).saturating_add(dh);
-            let area = (art.width as u128).saturating_mul(art.height as u128);
-            (overflow, area)
+        .enumerate()
+        .map(|(r_idx, row)| {
+            let color = match app.theme.capability {
+                crate::tmplayer::ui::theme::ColorCapability::TrueColor => {
+                    let t = if total_rows <= 1 {
+                        0.0
+                    } else {
+                        r_idx as f32 / (total_rows - 1) as f32
+                    };
+                    let r = (c1.0 as f32 * (1.0 - t) + c2.0 as f32 * t).round() as u8;
+                    let g = (c1.1 as f32 * (1.0 - t) + c2.1 as f32 * t).round() as u8;
+                    let b = (c1.2 as f32 * (1.0 - t) + c2.2 as f32 * t).round() as u8;
+                    ratatui::style::Color::Rgb(r, g, b)
+                }
+                _ => {
+                    if r_idx < total_rows / 2 {
+                        app.theme.color_accent()
+                    } else {
+                        app.theme.color_accent2()
+                    }
+                }
+            };
+            let text: String = row.into_iter().collect();
+            Line::from(Span::styled(
+                text,
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ))
         })
+        .collect()
 }
 
 fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
@@ -2059,6 +2079,21 @@ mod tests {
 
         let act_miss = hit_test(&layout, &app, 29, 5);
         assert_eq!(act_miss, None);
+    }
+
+    #[test]
+    fn test_tmplayer_about_modal_area() {
+        let terminal = Rect::new(0, 0, 80, 24);
+        let area = about_modal_area(terminal);
+        assert!(area.width <= terminal.width);
+        assert!(area.height <= terminal.height);
+        assert_eq!(area.width, 58);
+        assert_eq!(area.height, 16);
+
+        let small_terminal = Rect::new(0, 0, 50, 14);
+        let small_area = about_modal_area(small_terminal);
+        assert!(small_area.width <= small_terminal.width);
+        assert!(small_area.height <= small_terminal.height);
     }
 }
 

@@ -191,7 +191,12 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
             return Action::ExitSettings;
         }
         return match ev.code {
-            KeyCode::Esc | KeyCode::Enter | KeyCode::Backspace => Action::CloseOverlay,
+            KeyCode::Esc
+            | KeyCode::Left
+            | KeyCode::Enter
+            | KeyCode::Backspace
+            | KeyCode::Char('q')
+            | KeyCode::Char('Q') => Action::CloseOverlay,
             _ => Action::None,
         };
     }
@@ -548,5 +553,23 @@ mod tests {
             state: crossterm::event::KeyEventState::empty(),
         };
         assert_eq!(map_key(ev_upper, Overlay::None, &config), Action::OpenHome);
+    }
+
+    #[test]
+    fn test_about_modal_exit_keys() {
+        let config = Config::default();
+        let make_ev = |code: KeyCode| KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+
+        assert_eq!(map_key(make_ev(KeyCode::Char('q')), Overlay::AboutModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Char('Q')), Overlay::AboutModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Esc), Overlay::AboutModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Left), Overlay::AboutModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Enter), Overlay::AboutModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Backspace), Overlay::AboutModal, &config), Action::CloseOverlay);
     }
 }
