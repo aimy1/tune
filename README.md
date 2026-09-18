@@ -16,6 +16,7 @@
 </p>
 
 <p align="center">
+  <a href="#-功能演示">功能演示</a> •
   <a href="#-特性亮点">特性亮点</a> •
   <a href="#-桌面歌词">桌面歌词</a> •
   <a href="#-快速开始">快速开始</a> •
@@ -29,6 +30,23 @@
 ---
 
 `tune` 是一款专为终端极客与音乐爱好者打造的网易云音乐终端播放器。基于 **Rust** 与 **Ratatui** 异步渲染引擎构建，追求极致轻量、亚毫秒级输入响应，融入 **Catppuccin** 全色系主题、**Kitty / Sixel** 高清封面渲染、**跨屏拖拽悬浮桌面歌词** 以及沉浸式全屏微动效，让终端听歌体验兼具极客速度与现代美学。
+
+---
+
+## 🎬 功能演示
+
+<div align="center">
+  <video controls width="100%" poster="assets/preview.png">
+    <source src="https://github.com/aimy1/tune/raw/main/exhibit.mp4" type="video/mp4">
+    <source src="exhibit.mp4" type="video/mp4">
+    <a href="https://github.com/aimy1/tune/blob/main/exhibit.mp4">
+      <img src="assets/preview.png" alt="Tune 演示视频 (Demo Video)" width="100%" />
+    </a>
+  </video>
+  <p align="center">
+    <em>▶️ 点击上方视频播放，或 <a href="https://github.com/aimy1/tune/blob/main/exhibit.mp4"><strong>在此处在线观看完整高清展示视频 (exhibit.mp4)</strong></a></em>
+  </p>
+</div>
 
 ---
 
