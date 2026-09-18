@@ -119,6 +119,27 @@ pub struct Config {
     #[serde(default)]
     pub desktop_lyrics: bool,
 
+    #[serde(default = "default_desktop_lyrics_locked")]
+    pub desktop_lyrics_locked: bool,
+
+    #[serde(default = "default_desktop_lyrics_font_size")]
+    pub desktop_lyrics_font_size: u16,
+
+    #[serde(default = "default_desktop_lyrics_dual_line")]
+    pub desktop_lyrics_dual_line: bool,
+
+    #[serde(default = "default_desktop_lyrics_align")]
+    pub desktop_lyrics_align: DesktopLyricsAlign,
+
+    #[serde(default = "default_desktop_lyrics_bg")]
+    pub desktop_lyrics_bg: DesktopLyricsBg,
+
+    #[serde(default)]
+    pub desktop_lyrics_pos_x: Option<i32>,
+
+    #[serde(default)]
+    pub desktop_lyrics_pos_y: Option<i32>,
+
     #[serde(default = "default_audio_quality")]
     pub audio_quality: AudioQuality,
 
@@ -524,6 +545,122 @@ fn default_keybind_desktop_lyrics() -> String {
     crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DesktopLyricsAlign {
+    #[default]
+    Center,
+    Left,
+    Right,
+}
+
+impl DesktopLyricsAlign {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Center => "center",
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+
+    pub fn cycle(self, delta: i32) -> Self {
+        let items = [Self::Center, Self::Left, Self::Right];
+        let idx = match self {
+            Self::Center => 0,
+            Self::Left => 1,
+            Self::Right => 2,
+        };
+        let next = (idx as i32 + delta).rem_euclid(items.len() as i32) as usize;
+        items[next]
+    }
+
+    pub fn display_name(&self, lang: Language) -> &'static str {
+        match (self, lang) {
+            (Self::Center, Language::Zh) => "居中",
+            (Self::Center, Language::En) => "Center",
+            (Self::Left, Language::Zh) => "居左",
+            (Self::Left, Language::En) => "Left",
+            (Self::Right, Language::Zh) => "居右",
+            (Self::Right, Language::En) => "Right",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DesktopLyricsBg {
+    #[default]
+    Translucent,
+    Dark,
+    Light,
+    Transparent,
+}
+
+impl DesktopLyricsBg {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Translucent => "translucent",
+            Self::Dark => "dark",
+            Self::Light => "light",
+            Self::Transparent => "transparent",
+        }
+    }
+
+    pub fn cycle(self, delta: i32) -> Self {
+        let items = [Self::Translucent, Self::Dark, Self::Light, Self::Transparent];
+        let idx = match self {
+            Self::Translucent => 0,
+            Self::Dark => 1,
+            Self::Light => 2,
+            Self::Transparent => 3,
+        };
+        let next = (idx as i32 + delta).rem_euclid(items.len() as i32) as usize;
+        items[next]
+    }
+
+    pub fn display_name(&self, lang: Language) -> &'static str {
+        match (self, lang) {
+            (Self::Translucent, Language::Zh) => "经典半透明",
+            (Self::Translucent, Language::En) => "Translucent",
+            (Self::Dark, Language::Zh) => "深色磨砂",
+            (Self::Dark, Language::En) => "Dark Blur",
+            (Self::Light, Language::Zh) => "轻薄高透",
+            (Self::Light, Language::En) => "Light Glass",
+            (Self::Transparent, Language::Zh) => "纯净无底色",
+            (Self::Transparent, Language::En) => "Pure Text",
+        }
+    }
+}
+
+pub const DESKTOP_LYRICS_FONT_SIZES: [u16; 6] = [16, 18, 20, 24, 28, 32];
+
+pub fn cycle_desktop_lyrics_font_size(current: u16, delta: i32) -> u16 {
+    let sizes = DESKTOP_LYRICS_FONT_SIZES;
+    let idx = sizes.iter().position(|&s| s == current).unwrap_or(2);
+    let next = (idx as i32 + delta).rem_euclid(sizes.len() as i32) as usize;
+    sizes[next]
+}
+
+fn default_desktop_lyrics_locked() -> bool {
+    true
+}
+
+fn default_desktop_lyrics_font_size() -> u16 {
+    20
+}
+
+fn default_desktop_lyrics_dual_line() -> bool {
+    true
+}
+
+fn default_desktop_lyrics_align() -> DesktopLyricsAlign {
+    DesktopLyricsAlign::Center
+}
+
+fn default_desktop_lyrics_bg() -> DesktopLyricsBg {
+    DesktopLyricsBg::Translucent
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -551,6 +688,13 @@ impl Default for Config {
             language: default_language(),
             page_lyrics: default_page_lyrics(),
             desktop_lyrics: false,
+            desktop_lyrics_locked: default_desktop_lyrics_locked(),
+            desktop_lyrics_font_size: default_desktop_lyrics_font_size(),
+            desktop_lyrics_dual_line: default_desktop_lyrics_dual_line(),
+            desktop_lyrics_align: default_desktop_lyrics_align(),
+            desktop_lyrics_bg: default_desktop_lyrics_bg(),
+            desktop_lyrics_pos_x: None,
+            desktop_lyrics_pos_y: None,
             audio_quality: default_audio_quality(),
             playback_memory: false,
             transparent_sidebar: false,
@@ -717,5 +861,60 @@ mod tests {
                 toml::from_str(&format!("protocol = \"{}\"", raw)).unwrap();
             assert_eq!(parsed.protocol, expected);
         }
+    }
+
+    #[test]
+    fn test_desktop_lyrics_cycling_and_serde() {
+        use super::*;
+
+        // Font sizes
+        assert_eq!(cycle_desktop_lyrics_font_size(20, 1), 24);
+        assert_eq!(cycle_desktop_lyrics_font_size(32, 1), 16);
+        assert_eq!(cycle_desktop_lyrics_font_size(16, -1), 32);
+
+        // Align
+        assert_eq!(DesktopLyricsAlign::Center.cycle(1), DesktopLyricsAlign::Left);
+        assert_eq!(DesktopLyricsAlign::Left.cycle(1), DesktopLyricsAlign::Right);
+        assert_eq!(DesktopLyricsAlign::Right.cycle(1), DesktopLyricsAlign::Center);
+        assert_eq!(DesktopLyricsAlign::Center.as_str(), "center");
+
+        // Bg
+        assert_eq!(DesktopLyricsBg::Translucent.cycle(1), DesktopLyricsBg::Dark);
+        assert_eq!(DesktopLyricsBg::Transparent.cycle(1), DesktopLyricsBg::Translucent);
+        assert_eq!(DesktopLyricsBg::Dark.as_str(), "dark");
+
+        // Serde roundtrip
+        let mut cfg = Config::default();
+        cfg.desktop_lyrics = true;
+        cfg.desktop_lyrics_locked = false;
+        cfg.desktop_lyrics_font_size = 28;
+        cfg.desktop_lyrics_dual_line = false;
+        cfg.desktop_lyrics_align = DesktopLyricsAlign::Right;
+        cfg.desktop_lyrics_bg = DesktopLyricsBg::Dark;
+        cfg.desktop_lyrics_pos_x = Some(100);
+        cfg.desktop_lyrics_pos_y = Some(200);
+
+        let serialized = toml::to_string(&cfg).unwrap();
+        let parsed: Config = toml::from_str(&serialized).unwrap();
+        assert!(parsed.desktop_lyrics);
+        assert!(!parsed.desktop_lyrics_locked);
+        assert_eq!(parsed.desktop_lyrics_font_size, 28);
+        assert!(!parsed.desktop_lyrics_dual_line);
+        assert_eq!(parsed.desktop_lyrics_align, DesktopLyricsAlign::Right);
+        assert_eq!(parsed.desktop_lyrics_bg, DesktopLyricsBg::Dark);
+        assert_eq!(parsed.desktop_lyrics_pos_x, Some(100));
+        assert_eq!(parsed.desktop_lyrics_pos_y, Some(200));
+
+        // Legacy config backwards compatibility
+        let default_serialized = toml::to_string(&Config::default()).unwrap();
+        let legacy: Config = toml::from_str(&default_serialized).unwrap();
+        assert!(!legacy.desktop_lyrics);
+        assert!(legacy.desktop_lyrics_locked);
+        assert_eq!(legacy.desktop_lyrics_font_size, 20);
+        assert!(legacy.desktop_lyrics_dual_line);
+        assert_eq!(legacy.desktop_lyrics_align, DesktopLyricsAlign::Center);
+        assert_eq!(legacy.desktop_lyrics_bg, DesktopLyricsBg::Translucent);
+        assert_eq!(legacy.desktop_lyrics_pos_x, None);
+        assert_eq!(legacy.desktop_lyrics_pos_y, None);
     }
 }

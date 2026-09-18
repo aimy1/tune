@@ -272,6 +272,9 @@ impl Tui {
             match app.overlay {
                 Overlay::SettingsModal => render_settings_modal(f, size, app),
                 Overlay::BarSettingsModal => render_bar_settings_modal(f, size, app),
+                Overlay::DesktopLyricsSettingsModal => {
+                    render_desktop_lyrics_settings_modal(f, size, app)
+                }
                 Overlay::LocalAudioSettingsModal => render_local_audio_settings_modal(f, size, app),
                 Overlay::AboutModal => render_about_modal(f, size, app),
                 Overlay::AcoustIdModal => render_acoustid_modal(f, size, app),
@@ -627,6 +630,10 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
             lang_on_off(app, app.config.desktop_lyrics).to_string(),
         ),
         (
+            lang_text(app, "桌面歌词设置", "Desktop Lyrics Settings"),
+            "...".to_string(),
+        ),
+        (
             lang_text(app, "音质", "Audio Quality"),
             match app.config.audio_quality {
                 crate::tmplayer::data::config::AudioQuality::Standard => {
@@ -678,6 +685,129 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
                     .fg(app.theme.color_subtext())
                     .bg(app.theme.color_surface())
             } else if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
+
+    f.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
+}
+
+fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
+    let area = centered_rect(size, 70, 16);
+    f.render_widget(ratatui::widgets::Clear, area);
+
+    let title = lang_text(app, " 桌面歌词设置 ", " Desktop Lyrics Settings ");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .title(title)
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
+        .style(
+            Style::default()
+                .fg(app.theme.color_subtext())
+                .bg(app.theme.color_surface()),
+        );
+
+    f.render_widget(block, area);
+
+    let inner = area.inner(ratatui::layout::Margin {
+        horizontal: 2,
+        vertical: 1,
+    });
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+
+    let locked_str = if app.config.desktop_lyrics_locked {
+        lang_text(app, "锁定 (不可拖动)", "Locked (No Drag)")
+    } else {
+        lang_text(app, "解锁 (可拖动)", "Unlocked (Draggable)")
+    };
+
+    let dual_line_str = if app.config.desktop_lyrics_dual_line {
+        lang_text(app, "双行歌词", "Dual Lines")
+    } else {
+        lang_text(app, "单行歌词", "Single Line")
+    };
+
+    let align_str = app.config.desktop_lyrics_align.display_name(app.language);
+    let bg_str = app.config.desktop_lyrics_bg.display_name(app.language);
+
+    let pos_str = if let (Some(x), Some(y)) = (
+        app.config.desktop_lyrics_pos_x,
+        app.config.desktop_lyrics_pos_y,
+    ) {
+        format!("{}, {}", x, y)
+    } else {
+        lang_text(app, "底部居中 (默认)", "Bottom Center (Default)").to_string()
+    };
+
+    let raw_items = vec![
+        (
+            lang_text(app, "桌面歌词开关", "Desktop Lyrics"),
+            lang_on_off(app, app.config.desktop_lyrics).to_string(),
+        ),
+        (
+            lang_text(app, "锁定位置", "Lock Position"),
+            locked_str.to_string(),
+        ),
+        (
+            lang_text(app, "字体大小", "Font Size"),
+            format!("{}px", app.config.desktop_lyrics_font_size),
+        ),
+        (
+            lang_text(app, "歌词行数", "Lyrics Lines"),
+            dual_line_str.to_string(),
+        ),
+        (
+            lang_text(app, "歌词对齐", "Lyrics Alignment"),
+            align_str.to_string(),
+        ),
+        (
+            lang_text(app, "背景样式", "Background Style"),
+            bg_str.to_string(),
+        ),
+        (
+            lang_text(app, "恢复默认位置", "Reset Position"),
+            pos_str,
+        ),
+    ];
+
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.desktop_lyrics_settings_selected;
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
                 Style::default()
                     .fg(app.theme.color_base())
                     .bg(app.theme.color_accent())

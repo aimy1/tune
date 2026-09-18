@@ -148,6 +148,13 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
         graphics_protocol: app.config.graphics_protocol,
         page_lyrics: app.config.page_lyrics,
         desktop_lyrics: app.config.desktop_lyrics,
+        desktop_lyrics_locked: app.config.desktop_lyrics_locked,
+        desktop_lyrics_font_size: app.config.desktop_lyrics_font_size,
+        desktop_lyrics_dual_line: app.config.desktop_lyrics_dual_line,
+        desktop_lyrics_align: app.config.desktop_lyrics_align,
+        desktop_lyrics_bg: app.config.desktop_lyrics_bg,
+        desktop_lyrics_pos_x: app.config.desktop_lyrics_pos_x,
+        desktop_lyrics_pos_y: app.config.desktop_lyrics_pos_y,
         audio_quality: match app.config.audio_quality {
             AudioQuality::Standard => crate::data::config::AudioQuality::Standard,
             AudioQuality::Higher => crate::data::config::AudioQuality::Higher,
@@ -204,6 +211,14 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
     app.config.album_border = config.album_border;
     app.language = config.language;
     app.config.page_lyrics = config.page_lyrics;
+    app.config.desktop_lyrics = config.desktop_lyrics;
+    app.config.desktop_lyrics_locked = config.desktop_lyrics_locked;
+    app.config.desktop_lyrics_font_size = config.desktop_lyrics_font_size;
+    app.config.desktop_lyrics_dual_line = config.desktop_lyrics_dual_line;
+    app.config.desktop_lyrics_align = config.desktop_lyrics_align;
+    app.config.desktop_lyrics_bg = config.desktop_lyrics_bg;
+    app.config.desktop_lyrics_pos_x = config.desktop_lyrics_pos_x;
+    app.config.desktop_lyrics_pos_y = config.desktop_lyrics_pos_y;
     app.vip_audio_unlocked = config.vip_audio_unlocked;
     app.config.audio_quality = match config.audio_quality {
         crate::data::config::AudioQuality::Standard => AudioQuality::Standard,
@@ -1056,6 +1071,8 @@ async fn handle_action(
                 // here just set target
                 app.playlist_slide_target_x = -(layout.left_width as i16);
                 app.overlay = Overlay::None;
+            } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
+                app.overlay = Overlay::BarSettingsModal;
             } else if app.overlay == Overlay::AcoustIdModal
                 || app.overlay == Overlay::BarSettingsModal
                 || app.overlay == Overlay::LocalAudioSettingsModal
@@ -1236,20 +1253,27 @@ async fn handle_action(
                     save_and_sync_host_config(app, host_bridge).await;
                 }
                 8 => {
+                    app.desktop_lyrics_settings_selected = 0;
+                    app.overlay = Overlay::DesktopLyricsSettingsModal;
+                }
+                9 => {
                     app.config.audio_quality =
                         app.config.audio_quality.cycle(1, app.vip_audio_unlocked);
                     save_and_sync_host_config(app, host_bridge).await;
                 }
-                9 => {
+                10 => {
                     app.config.playback_memory = !app.config.playback_memory;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
-                10 => {
+                11 => {
                     app.config.transparent_sidebar = !app.config.transparent_sidebar;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
                 _ => {}
             },
+            Overlay::DesktopLyricsSettingsModal => {
+                apply_desktop_lyrics_settings_delta(app, host_bridge, 1).await;
+            }
             Overlay::LocalAudioSettingsModal => match app.local_audio_settings_selected {
                 0 => {
                     app.config.lyrics_cover_fetch = !app.config.lyrics_cover_fetch;
@@ -1416,11 +1440,18 @@ async fn handle_action(
                     app.settings_selected -= 1;
                 }
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 11;
+                let count = 12;
                 if app.bar_settings_selected == 0 {
                     app.bar_settings_selected = count - 1;
                 } else {
                     app.bar_settings_selected -= 1;
+                }
+            } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
+                let count = 7;
+                if app.desktop_lyrics_settings_selected == 0 {
+                    app.desktop_lyrics_settings_selected = count - 1;
+                } else {
+                    app.desktop_lyrics_settings_selected -= 1;
                 }
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 let count = 5;
@@ -1449,8 +1480,11 @@ async fn handle_action(
                 let count = 10;
                 app.settings_selected = (app.settings_selected + 1) % count;
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 11;
+                let count = 12;
                 app.bar_settings_selected = (app.bar_settings_selected + 1) % count;
+            } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
+                let count = 7;
+                app.desktop_lyrics_settings_selected = (app.desktop_lyrics_settings_selected + 1) % count;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 let count = 5;
                 app.local_audio_settings_selected = (app.local_audio_settings_selected + 1) % count;
@@ -1504,21 +1538,24 @@ async fn handle_action(
                         app.config.desktop_lyrics = !app.config.desktop_lyrics;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    8 => {
+                    8 => {}
+                    9 => {
                         app.config.audio_quality =
                             app.config.audio_quality.cycle(-1, app.vip_audio_unlocked);
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    9 => {
+                    10 => {
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    10 => {
+                    11 => {
                         app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     _ => {}
                 }
+            } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
+                apply_desktop_lyrics_settings_delta(app, host_bridge, -1).await;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 apply_local_audio_settings_delta(app, -1);
             } else if app.overlay == Overlay::EqModal {
@@ -1570,20 +1607,26 @@ async fn handle_action(
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     8 => {
+                        app.desktop_lyrics_settings_selected = 0;
+                        app.overlay = Overlay::DesktopLyricsSettingsModal;
+                    }
+                    9 => {
                         app.config.audio_quality =
                             app.config.audio_quality.cycle(1, app.vip_audio_unlocked);
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    9 => {
+                    10 => {
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    10 => {
+                    11 => {
                         app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     _ => {}
                 }
+            } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
+                apply_desktop_lyrics_settings_delta(app, host_bridge, 1).await;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 apply_local_audio_settings_delta(app, 1);
             } else if app.overlay == Overlay::EqModal {
@@ -2069,6 +2112,57 @@ async fn apply_settings_delta(
                 app.config.home_more_recommend = !app.config.home_more_recommend;
                 save_and_sync_host_config(app, host_bridge).await;
             }
+        }
+        _ => {}
+    }
+}
+
+async fn apply_desktop_lyrics_settings_delta(
+    app: &mut AppState,
+    host_bridge: &mut Option<&mut impl HostPlaybackBridge>,
+    delta: i32,
+) {
+    if delta == 0 {
+        return;
+    }
+    match app.desktop_lyrics_settings_selected {
+        0 => {
+            app.config.desktop_lyrics = !app.config.desktop_lyrics;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        1 => {
+            app.config.desktop_lyrics_locked = !app.config.desktop_lyrics_locked;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        2 => {
+            app.config.desktop_lyrics_font_size =
+                crate::data::config::cycle_desktop_lyrics_font_size(
+                    app.config.desktop_lyrics_font_size,
+                    delta,
+                );
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        3 => {
+            app.config.desktop_lyrics_dual_line = !app.config.desktop_lyrics_dual_line;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        4 => {
+            app.config.desktop_lyrics_align = app.config.desktop_lyrics_align.cycle(delta);
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        5 => {
+            app.config.desktop_lyrics_bg = app.config.desktop_lyrics_bg.cycle(delta);
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        6 => {
+            app.config.desktop_lyrics_pos_x = None;
+            app.config.desktop_lyrics_pos_y = None;
+            save_and_sync_host_config(app, host_bridge).await;
+            app.set_toast(if app.language == crate::data::config::Language::Zh {
+                "已恢复桌面歌词默认位置"
+            } else {
+                "Reset desktop lyrics position to default"
+            });
         }
         _ => {}
     }

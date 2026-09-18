@@ -14,14 +14,31 @@ pub struct DesktopLyricPayload {
     pub state: String,
     pub accent_color: String,
     pub subtext_color: String,
+    pub locked: bool,
+    pub font_size: u16,
+    pub dual_line: bool,
+    pub align: String,
+    pub bg: String,
+    pub pos_x: Option<i32>,
+    pub pos_y: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DesktopLyricsClientUpdate {
+    pub locked: Option<bool>,
+    pub pos_x: Option<i32>,
+    pub pos_y: Option<i32>,
+    pub reset_pos: bool,
 }
 
 pub struct DesktopLyricsManager {
     child: Option<Child>,
     script_path: PathBuf,
     state_file: PathBuf,
+    pos_file: PathBuf,
     text_file: PathBuf,
     last_payload: Option<DesktopLyricPayload>,
+    last_pos_mtime: Option<std::time::SystemTime>,
 }
 
 impl DesktopLyricsManager {
@@ -49,14 +66,17 @@ impl DesktopLyricsManager {
             .join("tune");
         let _ = fs::create_dir_all(&runtime_dir);
         let state_file = runtime_dir.join("desktop_lyric.json");
+        let pos_file = runtime_dir.join("desktop_lyric_pos.json");
         let text_file = cache_root.join("desktop_lyric.txt");
 
         Self {
             child: None,
             script_path,
             state_file,
+            pos_file,
             text_file,
             last_payload: None,
+            last_pos_mtime: None,
         }
     }
 
@@ -111,7 +131,44 @@ impl DesktopLyricsManager {
         }
         self.last_payload = None;
         let _ = fs::remove_file(&self.state_file);
+        let _ = fs::remove_file(&self.pos_file);
         let _ = fs::remove_file(&self.text_file);
+    }
+
+    pub fn check_client_updates(&mut self) -> Option<DesktopLyricsClientUpdate> {
+        if !self.pos_file.exists() {
+            return None;
+        }
+        let Ok(meta) = fs::metadata(&self.pos_file) else {
+            return None;
+        };
+        let Ok(mtime) = meta.modified() else {
+            return None;
+        };
+        if self.last_pos_mtime == Some(mtime) {
+            return None;
+        }
+        self.last_pos_mtime = Some(mtime);
+
+        let Ok(content) = fs::read_to_string(&self.pos_file) else {
+            return None;
+        };
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) else {
+            return None;
+        };
+
+        let locked = val.get("locked").and_then(|v| v.as_bool());
+        let pos_x = val.get("pos_x").and_then(|v| v.as_i64()).map(|n| n as i32);
+        let pos_y = val.get("pos_y").and_then(|v| v.as_i64()).map(|n| n as i32);
+        let has_pos_key = val.get("pos_x").is_some();
+        let reset_pos = has_pos_key && pos_x.is_none();
+
+        Some(DesktopLyricsClientUpdate {
+            locked,
+            pos_x,
+            pos_y,
+            reset_pos,
+        })
     }
 
     pub fn sync(&mut self, enabled: bool, payload: DesktopLyricPayload) {
@@ -144,6 +201,13 @@ impl DesktopLyricsManager {
             "state": payload.state,
             "accent_color": payload.accent_color,
             "subtext_color": payload.subtext_color,
+            "locked": payload.locked,
+            "font_size": payload.font_size,
+            "dual_line": payload.dual_line,
+            "align": payload.align,
+            "bg": payload.bg,
+            "pos_x": payload.pos_x,
+            "pos_y": payload.pos_y,
         });
 
         // Write atomic state file
@@ -196,6 +260,13 @@ mod tests {
             state: "Playing".to_string(),
             accent_color: "#b4befe".to_string(),
             subtext_color: "#a6adc8".to_string(),
+            locked: true,
+            font_size: 20,
+            dual_line: true,
+            align: "center".to_string(),
+            bg: "translucent".to_string(),
+            pos_x: Some(300),
+            pos_y: Some(400),
         };
 
         // Write payload without starting subprocess
@@ -208,12 +279,24 @@ mod tests {
         assert!(json_str.contains("Hello world lyric"));
         assert!(json_str.contains("你好世界"));
         assert!(json_str.contains("#b4befe"));
+        assert!(json_str.contains("\"font_size\":20"));
+        assert!(json_str.contains("\"pos_x\":300"));
 
         let txt_str = fs::read_to_string(&manager.text_file).unwrap();
         assert_eq!(txt_str, "Hello world lyric");
 
+        // Simulate client writing pos file
+        let pos_json = r#"{"locked": false, "pos_x": 450, "pos_y": 600}"#;
+        fs::write(&manager.pos_file, pos_json).unwrap();
+        let update = manager.check_client_updates().unwrap();
+        assert_eq!(update.locked, Some(false));
+        assert_eq!(update.pos_x, Some(450));
+        assert_eq!(update.pos_y, Some(600));
+        assert!(!update.reset_pos);
+
         // Clean up
         let _ = fs::remove_file(&manager.state_file);
+        let _ = fs::remove_file(&manager.pos_file);
         let _ = fs::remove_file(&manager.text_file);
         let _ = fs::remove_dir_all(&temp_dir);
     }

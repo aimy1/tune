@@ -1,4 +1,4 @@
-use crate::data::config::GraphicsProtocol;
+use crate::data::config::{DesktopLyricsAlign, DesktopLyricsBg, GraphicsProtocol};
 use crate::tmplayer::data::assets;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,27 @@ pub struct Config {
 
     #[serde(default)]
     pub desktop_lyrics: bool,
+
+    #[serde(default = "default_desktop_lyrics_locked")]
+    pub desktop_lyrics_locked: bool,
+
+    #[serde(default = "default_desktop_lyrics_font_size")]
+    pub desktop_lyrics_font_size: u16,
+
+    #[serde(default = "default_desktop_lyrics_dual_line")]
+    pub desktop_lyrics_dual_line: bool,
+
+    #[serde(default = "default_desktop_lyrics_align")]
+    pub desktop_lyrics_align: DesktopLyricsAlign,
+
+    #[serde(default = "default_desktop_lyrics_bg")]
+    pub desktop_lyrics_bg: DesktopLyricsBg,
+
+    #[serde(default)]
+    pub desktop_lyrics_pos_x: Option<i32>,
+
+    #[serde(default)]
+    pub desktop_lyrics_pos_y: Option<i32>,
 
     #[serde(default = "default_kitty_cover_scale_percent")]
     pub kitty_cover_scale_percent: u8,
@@ -386,6 +407,26 @@ fn default_keybind_desktop_lyrics() -> String {
     "Alt+D".to_string()
 }
 
+fn default_desktop_lyrics_locked() -> bool {
+    true
+}
+
+fn default_desktop_lyrics_font_size() -> u16 {
+    20
+}
+
+fn default_desktop_lyrics_dual_line() -> bool {
+    true
+}
+
+fn default_desktop_lyrics_align() -> DesktopLyricsAlign {
+    DesktopLyricsAlign::Center
+}
+
+fn default_desktop_lyrics_bg() -> DesktopLyricsBg {
+    DesktopLyricsBg::Translucent
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -400,6 +441,13 @@ impl Default for Config {
             graphics_protocol: GraphicsProtocol::default(),
             page_lyrics: false,
             desktop_lyrics: false,
+            desktop_lyrics_locked: default_desktop_lyrics_locked(),
+            desktop_lyrics_font_size: default_desktop_lyrics_font_size(),
+            desktop_lyrics_dual_line: default_desktop_lyrics_dual_line(),
+            desktop_lyrics_align: default_desktop_lyrics_align(),
+            desktop_lyrics_bg: default_desktop_lyrics_bg(),
+            desktop_lyrics_pos_x: None,
+            desktop_lyrics_pos_y: None,
             kitty_cover_scale_percent: default_kitty_cover_scale_percent(),
             super_smooth_bar: false,
             bars_gap: false,

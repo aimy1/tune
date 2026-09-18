@@ -62,7 +62,8 @@ const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 10;
-const SETTINGS_PLAYBACK_ITEMS: usize = 11;
+const SETTINGS_PLAYBACK_ITEMS: usize = 12;
+const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 7;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 20;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
@@ -88,6 +89,7 @@ pub enum Page {
 pub enum Overlay {
     Settings,
     SettingsPlayback,
+    SettingsDesktopLyrics,
     SettingsKeybinds,
     SettingsAbout,
     SearchBox,
@@ -1645,6 +1647,7 @@ pub struct App {
     pub search_box_anim_height: u16,
     pub settings_selected: usize,
     pub settings_playback_selected: usize,
+    pub settings_desktop_lyrics_selected: usize,
     pub settings_keybind_selected: usize,
     pub settings_keybind_rebinding: Option<usize>,
     pub session_cookie: Option<String>,
@@ -1769,6 +1772,7 @@ impl App {
             search_box_anim_height: 0,
             settings_selected: 0,
             settings_playback_selected: 0,
+            settings_desktop_lyrics_selected: 0,
             settings_keybind_selected: 0,
             settings_keybind_rebinding: None,
             session_cookie: None,
@@ -2479,6 +2483,40 @@ impl App {
     }
 
     pub fn sync_desktop_lyrics(&mut self) {
+        if let Some(update) = self.desktop_lyrics_manager.check_client_updates() {
+            let mut changed = false;
+            if let Some(locked) = update.locked {
+                if self.config.desktop_lyrics_locked != locked {
+                    self.config.desktop_lyrics_locked = locked;
+                    changed = true;
+                }
+            }
+            if let Some(x) = update.pos_x {
+                if self.config.desktop_lyrics_pos_x != Some(x) {
+                    self.config.desktop_lyrics_pos_x = Some(x);
+                    changed = true;
+                }
+            }
+            if let Some(y) = update.pos_y {
+                if self.config.desktop_lyrics_pos_y != Some(y) {
+                    self.config.desktop_lyrics_pos_y = Some(y);
+                    changed = true;
+                }
+            }
+            if update.reset_pos {
+                if self.config.desktop_lyrics_pos_x.is_some()
+                    || self.config.desktop_lyrics_pos_y.is_some()
+                {
+                    self.config.desktop_lyrics_pos_x = None;
+                    self.config.desktop_lyrics_pos_y = None;
+                    changed = true;
+                }
+            }
+            if changed {
+                let _ = self.config.save();
+            }
+        }
+
         let enabled = self.config.desktop_lyrics;
         let (line1, line2) = self.current_page_lyric_lines();
         let (title, artist) = if let Some(track) = self.now_playing.as_ref() {
@@ -2505,6 +2543,13 @@ impl App {
             state: state.to_string(),
             accent_color: accent_hex,
             subtext_color: subtext_hex,
+            locked: self.config.desktop_lyrics_locked,
+            font_size: self.config.desktop_lyrics_font_size,
+            dual_line: self.config.desktop_lyrics_dual_line,
+            align: self.config.desktop_lyrics_align.as_str().to_string(),
+            bg: self.config.desktop_lyrics_bg.as_str().to_string(),
+            pos_x: self.config.desktop_lyrics_pos_x,
+            pos_y: self.config.desktop_lyrics_pos_y,
         };
 
         self.desktop_lyrics_manager.sync(enabled, payload);
@@ -2733,6 +2778,7 @@ impl App {
         match overlay {
             Overlay::Settings => self.handle_settings_root_key(key).await,
             Overlay::SettingsPlayback => self.handle_settings_playback_key(key),
+            Overlay::SettingsDesktopLyrics => self.handle_settings_desktop_lyrics_key(key),
             Overlay::SettingsKeybinds => self.handle_settings_keybinds_key(key),
             Overlay::SettingsAbout => self.handle_settings_about_key(key),
             Overlay::SearchBox => self.handle_search_box_key(key).await,
@@ -4347,6 +4393,35 @@ impl App {
         }
     }
 
+    fn handle_settings_desktop_lyrics_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => self.overlay = Some(Overlay::SettingsPlayback),
+            KeyCode::Char('t') | KeyCode::Char('T') => {
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
+                    self.close_overlay();
+                }
+            }
+            KeyCode::Left => {
+                self.apply_settings_desktop_lyrics_delta(-1);
+            }
+            KeyCode::Right | KeyCode::Enter => {
+                self.apply_settings_desktop_lyrics_delta(1);
+            }
+            KeyCode::Up | KeyCode::BackTab => {
+                if self.settings_desktop_lyrics_selected == 0 {
+                    self.settings_desktop_lyrics_selected = SETTINGS_DESKTOP_LYRICS_ITEMS - 1;
+                } else {
+                    self.settings_desktop_lyrics_selected -= 1;
+                }
+            }
+            KeyCode::Down | KeyCode::Tab => {
+                self.settings_desktop_lyrics_selected =
+                    (self.settings_desktop_lyrics_selected + 1) % SETTINGS_DESKTOP_LYRICS_ITEMS;
+            }
+            _ => {}
+        }
+    }
+
     fn handle_settings_keybinds_key(&mut self, key: KeyEvent) {
         if let Some(index) = self.settings_keybind_rebinding {
             match key.code {
@@ -4582,13 +4657,17 @@ impl App {
                 self.toggle_desktop_lyrics();
             }
             8 => {
+                self.settings_desktop_lyrics_selected = 0;
+                self.overlay = Some(Overlay::SettingsDesktopLyrics);
+            }
+            9 => {
                 let next = self
                     .config
                     .audio_quality
                     .cycle(delta, self.vip_audio_unlocked);
                 self.set_audio_quality(next);
             }
-            9 => {
+            10 => {
                 self.config.playback_memory = !self.config.playback_memory;
                 let _ = self.config.save();
                 if self.config.playback_memory {
@@ -4597,9 +4676,60 @@ impl App {
                     self.clear_playback_memory();
                 }
             }
-            10 => {
+            11 => {
                 self.config.transparent_sidebar = !self.config.transparent_sidebar;
                 let _ = self.config.save();
+            }
+            _ => {}
+        }
+    }
+
+    fn apply_settings_desktop_lyrics_delta(&mut self, delta: i32) {
+        if delta == 0 {
+            return;
+        }
+
+        match self.settings_desktop_lyrics_selected {
+            0 => {
+                self.toggle_desktop_lyrics();
+            }
+            1 => {
+                self.config.desktop_lyrics_locked = !self.config.desktop_lyrics_locked;
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            2 => {
+                self.config.desktop_lyrics_font_size =
+                    crate::data::config::cycle_desktop_lyrics_font_size(
+                        self.config.desktop_lyrics_font_size,
+                        delta,
+                    );
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            3 => {
+                self.config.desktop_lyrics_dual_line = !self.config.desktop_lyrics_dual_line;
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            4 => {
+                self.config.desktop_lyrics_align = self.config.desktop_lyrics_align.cycle(delta);
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            5 => {
+                self.config.desktop_lyrics_bg = self.config.desktop_lyrics_bg.cycle(delta);
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            6 => {
+                self.config.desktop_lyrics_pos_x = None;
+                self.config.desktop_lyrics_pos_y = None;
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+                self.set_runtime_status(
+                    self.lang_text("已恢复桌面歌词默认位置", "Reset desktop lyrics position to default"),
+                );
             }
             _ => {}
         }
@@ -5102,6 +5232,13 @@ impl App {
             graphics_protocol: self.config.graphics_protocol,
             page_lyrics: self.config.page_lyrics,
             desktop_lyrics: self.config.desktop_lyrics,
+            desktop_lyrics_locked: self.config.desktop_lyrics_locked,
+            desktop_lyrics_font_size: self.config.desktop_lyrics_font_size,
+            desktop_lyrics_dual_line: self.config.desktop_lyrics_dual_line,
+            desktop_lyrics_align: self.config.desktop_lyrics_align,
+            desktop_lyrics_bg: self.config.desktop_lyrics_bg,
+            desktop_lyrics_pos_x: self.config.desktop_lyrics_pos_x,
+            desktop_lyrics_pos_y: self.config.desktop_lyrics_pos_y,
             audio_quality: self.config.audio_quality,
             eq_bands_db: self.config.eq_bands_db,
             playback_memory: self.config.playback_memory,
@@ -5155,10 +5292,57 @@ impl App {
             changed = true;
         }
 
+        let mut desktop_lyrics_dirty = false;
         if self.config.desktop_lyrics != sync.desktop_lyrics {
             self.config.desktop_lyrics = sync.desktop_lyrics;
-            self.sync_desktop_lyrics();
             changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_locked != sync.desktop_lyrics_locked {
+            self.config.desktop_lyrics_locked = sync.desktop_lyrics_locked;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_font_size != sync.desktop_lyrics_font_size {
+            self.config.desktop_lyrics_font_size = sync.desktop_lyrics_font_size;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_dual_line != sync.desktop_lyrics_dual_line {
+            self.config.desktop_lyrics_dual_line = sync.desktop_lyrics_dual_line;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_align != sync.desktop_lyrics_align {
+            self.config.desktop_lyrics_align = sync.desktop_lyrics_align;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_bg != sync.desktop_lyrics_bg {
+            self.config.desktop_lyrics_bg = sync.desktop_lyrics_bg;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_pos_x != sync.desktop_lyrics_pos_x {
+            self.config.desktop_lyrics_pos_x = sync.desktop_lyrics_pos_x;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_pos_y != sync.desktop_lyrics_pos_y {
+            self.config.desktop_lyrics_pos_y = sync.desktop_lyrics_pos_y;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if desktop_lyrics_dirty {
+            self.sync_desktop_lyrics();
         }
 
         if self.vip_audio_unlocked != sync.vip_audio_unlocked {

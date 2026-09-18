@@ -23,6 +23,7 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
     let title = match app.overlay {
         Some(Overlay::Settings) => l(app, " 设置 ", " Settings "),
         Some(Overlay::SettingsPlayback) => l(app, " 播放设置 ", " Playback Settings "),
+        Some(Overlay::SettingsDesktopLyrics) => l(app, " 桌面歌词设置 ", " Desktop Lyrics Settings "),
         Some(Overlay::SettingsKeybinds) => l(app, " 按键绑定 ", " Keybinds "),
         Some(Overlay::SettingsAbout) => " about ",
         _ => l(app, " 设置 ", " Settings "),
@@ -49,6 +50,7 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
 
     match app.overlay {
         Some(Overlay::SettingsPlayback) => draw_playback_settings(frame, app, inner),
+        Some(Overlay::SettingsDesktopLyrics) => draw_desktop_lyrics_settings(frame, app, inner),
         Some(Overlay::SettingsKeybinds) => draw_keybind_settings(frame, app, inner),
         _ => draw_root_settings(frame, app, inner),
     }
@@ -207,6 +209,10 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             on_off(app, app.config.desktop_lyrics).to_string()
         ),
         (
+            l(app, "桌面歌词设置", "Desktop Lyrics Settings"),
+            "...".to_string()
+        ),
+        (
             l(app, "音质", "Audio Quality"),
             audio_quality_label(app, app.config.audio_quality).to_string()
         ),
@@ -245,6 +251,107 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             Line::from(Span::styled(line_str, style))
         })
         .collect();
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
+}
+
+fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
+
+    let locked_str = if app.config.desktop_lyrics_locked {
+        l(app, "锁定 (不可拖动)", "Locked (No Drag)")
+    } else {
+        l(app, "解锁 (可拖动)", "Unlocked (Draggable)")
+    };
+
+    let dual_line_str = if app.config.desktop_lyrics_dual_line {
+        l(app, "双行歌词", "Dual Lines")
+    } else {
+        l(app, "单行歌词", "Single Line")
+    };
+
+    let align_str = app.config.desktop_lyrics_align.display_name(app.config.language);
+    let bg_str = app.config.desktop_lyrics_bg.display_name(app.config.language);
+
+    let pos_str = if let (Some(x), Some(y)) = (
+        app.config.desktop_lyrics_pos_x,
+        app.config.desktop_lyrics_pos_y,
+    ) {
+        format!("{}, {}", x, y)
+    } else {
+        l(app, "底部居中 (默认)", "Bottom Center (Default)").to_string()
+    };
+
+    let raw_items = vec![
+        (
+            l(app, "桌面歌词开关", "Desktop Lyrics"),
+            on_off(app, app.config.desktop_lyrics).to_string(),
+        ),
+        (
+            l(app, "锁定位置", "Lock Position"),
+            locked_str.to_string(),
+        ),
+        (
+            l(app, "字体大小", "Font Size"),
+            format!("{}px", app.config.desktop_lyrics_font_size),
+        ),
+        (
+            l(app, "歌词行数", "Lyrics Lines"),
+            dual_line_str.to_string(),
+        ),
+        (
+            l(app, "歌词对齐", "Lyrics Alignment"),
+            align_str.to_string(),
+        ),
+        (
+            l(app, "背景样式", "Background Style"),
+            bg_str.to_string(),
+        ),
+        (
+            l(app, "恢复默认位置", "Reset Position"),
+            pos_str,
+        ),
+    ];
+
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.settings_desktop_lyrics_selected;
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
+
     frame.render_widget(
         Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
         rows[1],

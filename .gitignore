@@ -13,3 +13,5 @@ dhat-heap.json
 dhat.svg
 
 /.remember
+__pycache__/
+*.pyc

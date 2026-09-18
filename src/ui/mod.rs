@@ -172,6 +172,7 @@ pub fn draw_settings(frame: &mut Frame, app: &mut App) {
         app.overlay,
         Some(Overlay::Settings)
             | Some(Overlay::SettingsPlayback)
+            | Some(Overlay::SettingsDesktopLyrics)
             | Some(Overlay::SettingsKeybinds)
             | Some(Overlay::SettingsAbout)
     ) {

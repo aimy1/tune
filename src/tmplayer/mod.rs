@@ -15,8 +15,8 @@ use std::time::Duration;
 
 use crate::data::config::{
     AudioQuality as HostAudioQuality, BarChannels as HostBarChannels, BarNumber as HostBarNumber,
-    Config as HostConfig, GraphicsProtocol, Language as HostLanguage,
-    VisualizeMode as HostVisualizeMode,
+    Config as HostConfig, DesktopLyricsAlign, DesktopLyricsBg, GraphicsProtocol,
+    Language as HostLanguage, VisualizeMode as HostVisualizeMode,
 };
 
 #[derive(Debug, Clone)]
@@ -107,6 +107,13 @@ pub struct HostConfigSync {
     pub graphics_protocol: GraphicsProtocol,
     pub page_lyrics: bool,
     pub desktop_lyrics: bool,
+    pub desktop_lyrics_locked: bool,
+    pub desktop_lyrics_font_size: u16,
+    pub desktop_lyrics_dual_line: bool,
+    pub desktop_lyrics_align: DesktopLyricsAlign,
+    pub desktop_lyrics_bg: DesktopLyricsBg,
+    pub desktop_lyrics_pos_x: Option<i32>,
+    pub desktop_lyrics_pos_y: Option<i32>,
     pub audio_quality: HostAudioQuality,
     pub eq_bands_db: [f32; crate::tmplayer::app::state::EQ_BANDS],
     pub playback_memory: bool,
@@ -185,6 +192,13 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         transparent_background: host.transparent_background,
         page_lyrics: host.page_lyrics,
         desktop_lyrics: host.desktop_lyrics,
+        desktop_lyrics_locked: host.desktop_lyrics_locked,
+        desktop_lyrics_font_size: host.desktop_lyrics_font_size,
+        desktop_lyrics_dual_line: host.desktop_lyrics_dual_line,
+        desktop_lyrics_align: host.desktop_lyrics_align,
+        desktop_lyrics_bg: host.desktop_lyrics_bg,
+        desktop_lyrics_pos_x: host.desktop_lyrics_pos_x,
+        desktop_lyrics_pos_y: host.desktop_lyrics_pos_y,
         album_border: host.album_border,
         graphics_protocol: host.graphics_protocol,
         kitty_cover_scale_percent: host.kitty_cover_scale_percent,

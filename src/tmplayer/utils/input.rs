@@ -114,7 +114,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         };
     }
 
-    if overlay == Overlay::BarSettingsModal {
+    if overlay == Overlay::BarSettingsModal || overlay == Overlay::DesktopLyricsSettingsModal {
         return match ev.code {
             KeyCode::Esc => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
