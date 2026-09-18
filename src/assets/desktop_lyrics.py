@@ -68,6 +68,53 @@ def get_hyprland_cursor_pos():
     return None
 
 
+def find_monitor_for_point(display, x, y):
+    n = display.get_n_monitors()
+    if n == 0:
+        return None, None
+
+    # 1. Exact match
+    for i in range(n):
+        m = display.get_monitor(i)
+        geom = m.get_geometry()
+        if geom.x <= x < geom.x + geom.width and geom.y <= y < geom.y + geom.height:
+            return m, geom
+
+    # 2. Closest monitor center
+    best_monitor = None
+    best_geom = None
+    min_dist_sq = float('inf')
+    for i in range(n):
+        m = display.get_monitor(i)
+        geom = m.get_geometry()
+        cx = geom.x + geom.width / 2.0
+        cy = geom.y + geom.height / 2.0
+        dist_sq = (x - cx) ** 2 + (y - cy) ** 2
+        if dist_sq < min_dist_sq:
+            min_dist_sq = dist_sq
+            best_monitor = m
+            best_geom = geom
+
+    return best_monitor, best_geom
+
+
+def get_total_screen_bounds(display):
+    n = display.get_n_monitors()
+    if n == 0:
+        return 0, 0, 1920, 1080
+    min_x = float('inf')
+    min_y = float('inf')
+    max_x = float('-inf')
+    max_y = float('-inf')
+    for i in range(n):
+        geom = display.get_monitor(i).get_geometry()
+        min_x = min(min_x, geom.x)
+        min_y = min(min_y, geom.y)
+        max_x = max(max_x, geom.x + geom.width)
+        max_y = max(max_y, geom.y + geom.height)
+    return int(min_x), int(min_y), int(max_x), int(max_y)
+
+
 class DesktopLyricsWindow(Gtk.Window):
     def __init__(self, state_path):
         super().__init__(title='Tune Desktop Lyrics')
@@ -89,7 +136,8 @@ class DesktopLyricsWindow(Gtk.Window):
         self.custom_pos_x = None
         self.custom_pos_y = None
 
-        # Drag state
+        # Drag state & monitor
+        self.current_monitor = None
         self.dragging = False
         self.drag_start_mouse = (0, 0)
         self.drag_start_win = (0, 0)
@@ -111,6 +159,12 @@ class DesktopLyricsWindow(Gtk.Window):
         if has_layer_shell:
             GtkLayerShell.init_for_window(self)
             GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+            display = Gdk.Display.get_default()
+            self.current_monitor = display.get_primary_monitor() or (
+                display.get_monitor(0) if display.get_n_monitors() > 0 else None
+            )
+            if self.current_monitor:
+                GtkLayerShell.set_monitor(self, self.current_monitor)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, True)
             GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, 54)
             GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.NONE)
@@ -219,7 +273,7 @@ class DesktopLyricsWindow(Gtk.Window):
 
     def on_reset_clicked(self, btn):
         self.reset_to_default_position()
-        self.save_client_updates()
+        self.save_client_updates(reset_pos=True)
 
     def set_locked_state(self, locked):
         self.locked = locked
@@ -230,10 +284,17 @@ class DesktopLyricsWindow(Gtk.Window):
         self.update_style()
         self.apply_click_through_state()
 
-    def reset_to_default_position(self):
+    def reset_to_default_position(self, target_monitor=None):
         self.custom_pos_x = None
         self.custom_pos_y = None
+        display = Gdk.Display.get_default()
+        monitor = target_monitor or self.current_monitor or display.get_primary_monitor() or (
+            display.get_monitor(0) if display.get_n_monitors() > 0 else None
+        )
         if has_layer_shell:
+            if monitor:
+                GtkLayerShell.set_monitor(self, monitor)
+                self.current_monitor = monitor
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, False)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, False)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.RIGHT, False)
@@ -242,56 +303,95 @@ class DesktopLyricsWindow(Gtk.Window):
             GtkLayerShell.set_margin(self, GtkLayerShell.Edge.LEFT, 0)
             GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, 0)
         else:
-            screen = self.get_screen()
+            geom = monitor.get_geometry() if monitor else Gdk.Rectangle()
             alloc = self.get_allocation()
             w = alloc.width if alloc.width > 50 else 600
             h = alloc.height if alloc.height > 20 else 80
-            x = (screen.get_width() - w) // 2
-            y = screen.get_height() - h - 50
+            mw = geom.width if geom.width > 100 else 1920
+            mh = geom.height if geom.height > 100 else 1080
+            x = geom.x + (mw - w) // 2
+            y = geom.y + mh - h - 54
             self.move(x, y)
 
-    def apply_custom_position(self, x, y):
+    def apply_custom_position(self, x, y, target_monitor=None):
         self.custom_pos_x = x
         self.custom_pos_y = y
         self.current_win_x = x
         self.current_win_y = y
+
+        display = Gdk.Display.get_default()
+        if target_monitor is not None:
+            monitor = target_monitor
+            geom = monitor.get_geometry()
+        else:
+            alloc = self.get_allocation()
+            w = alloc.width if alloc.width > 50 else 600
+            h = alloc.height if alloc.height > 20 else 80
+            monitor, geom = find_monitor_for_point(display, x + w // 2, y + h // 2)
+
         if has_layer_shell:
+            if monitor and monitor != self.current_monitor:
+                GtkLayerShell.set_monitor(self, monitor)
+                self.current_monitor = monitor
+
+            rel_x = x - (geom.x if geom else 0)
+            rel_y = y - (geom.y if geom else 0)
+
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, False)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.RIGHT, False)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, True)
             GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, True)
-            GtkLayerShell.set_margin(self, GtkLayerShell.Edge.LEFT, int(x))
-            GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, int(y))
+            GtkLayerShell.set_margin(self, GtkLayerShell.Edge.LEFT, int(rel_x))
+            GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, int(rel_y))
         else:
             self.move(int(x), int(y))
 
     def on_button_press(self, widget, event):
         if self.locked:
             return False
+
+        # Don't intercept drag if clicking on buttons
+        for btn in (self.btn_lock, self.btn_reset):
+            if btn.get_visible():
+                alloc = btn.get_allocation()
+                coords = btn.translate_coordinates(self, 0, 0)
+                if coords:
+                    bx, by = coords
+                    if bx <= event.x <= bx + alloc.width and by <= event.y <= by + alloc.height:
+                        return False
+
         if event.button == 1:
             self.dragging = True
+            self.update_style()
+
             hypr_pos = get_hyprland_cursor_pos()
             if hypr_pos:
                 self.drag_start_mouse = hypr_pos
             else:
                 self.drag_start_mouse = (int(event.x_root), int(event.y_root))
 
+            display = Gdk.Display.get_default()
+            cur_monitor, cur_geom = find_monitor_for_point(
+                display, self.drag_start_mouse[0], self.drag_start_mouse[1]
+            )
+
             # Determine initial window position
             if self.custom_pos_x is not None and self.custom_pos_y is not None:
                 self.drag_start_win = (self.custom_pos_x, self.custom_pos_y)
             else:
-                # Estimate current default position (bottom center)
-                display = Gdk.Display.get_default()
-                monitor = display.get_primary_monitor() or display.get_monitor(0)
-                geom = monitor.get_geometry() if monitor else Gdk.Rectangle()
                 alloc = self.get_allocation()
                 w = alloc.width if alloc.width > 50 else 600
                 h = alloc.height if alloc.height > 20 else 80
-                mw = geom.width if geom.width > 100 else 1920
-                mh = geom.height if geom.height > 100 else 1080
-                est_x = geom.x + (mw - w) // 2
-                est_y = geom.y + mh - h - 54
+                mw = cur_geom.width if cur_geom and cur_geom.width > 100 else 1920
+                mh = cur_geom.height if cur_geom and cur_geom.height > 100 else 1080
+                gx = cur_geom.x if cur_geom else 0
+                gy = cur_geom.y if cur_geom else 0
+                est_x = gx + (mw - w) // 2
+                est_y = gy + mh - h - 54
                 self.drag_start_win = (est_x, est_y)
+
+            if cur_monitor:
+                self.current_monitor = cur_monitor
 
             gdk_win = self.get_window()
             if gdk_win:
@@ -318,22 +418,22 @@ class DesktopLyricsWindow(Gtk.Window):
         target_x = self.drag_start_win[0] + dx
         target_y = self.drag_start_win[1] + dy
 
-        # Clamp within screen bounds
+        # Clamp within multi-monitor total screen bounds
         display = Gdk.Display.get_default()
-        monitor = display.get_primary_monitor() or display.get_monitor(0)
-        geom = monitor.get_geometry() if monitor else Gdk.Rectangle()
-        mw = geom.width if geom.width > 100 else 1920
-        mh = geom.height if geom.height > 100 else 1080
+        min_x, min_y, max_x, max_y = get_total_screen_bounds(display)
 
-        target_x = max(0, min(geom.x + mw - 120, target_x))
-        target_y = max(0, min(geom.y + mh - 50, target_y))
+        target_x = max(min_x, min(max_x - 120, target_x))
+        target_y = max(min_y, min(max_y - 40, target_y))
 
-        self.apply_custom_position(target_x, target_y)
+        # Find target monitor for the cursor position
+        monitor, _ = find_monitor_for_point(display, cur_mouse[0], cur_mouse[1])
+        self.apply_custom_position(target_x, target_y, target_monitor=monitor)
         return True
 
     def on_button_release(self, widget, event):
         if event.button == 1 and self.dragging:
             self.dragging = False
+            self.update_style()
             gdk_win = self.get_window()
             if gdk_win:
                 display = self.get_display()
@@ -344,12 +444,13 @@ class DesktopLyricsWindow(Gtk.Window):
             return True
         return False
 
-    def save_client_updates(self):
+    def save_client_updates(self, reset_pos=False):
         try:
             data = {
                 "locked": self.locked,
                 "pos_x": self.custom_pos_x,
                 "pos_y": self.custom_pos_y,
+                "reset_pos": reset_pos,
             }
             tmp = self.pos_path + ".tmp"
             with open(tmp, 'w', encoding='utf-8') as f:
@@ -368,13 +469,27 @@ class DesktopLyricsWindow(Gtk.Window):
         else: # translucent
             bg_css = f"background: rgba(18, 18, 26, 0.78); border: 1px solid rgba(51, 204, 255, 0.35); border-radius: 18px;"
 
-        unlocked_extra = ""
-        if not self.locked:
-            unlocked_extra = f"""
+        if self.dragging:
+            drag_border_css = f"""
             #lyrics-container {{
-                border: 1.5px dashed {self.current_accent} !important;
+                border: 2px solid {self.current_accent} !important;
+                box-shadow: 0 0 20px {self.current_accent}, inset 0 0 10px rgba(255, 255, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.85) !important;
+                background: rgba(16, 16, 26, 0.95) !important;
+            }}
+            #drag-hint {{
+                color: {self.current_accent} !important;
+                font-weight: 700 !important;
             }}
             """
+        elif not self.locked:
+            drag_border_css = f"""
+            #lyrics-container {{
+                border: 1.5px dashed {self.current_accent} !important;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+            }}
+            """
+        else:
+            drag_border_css = ""
 
         main_fs = self.font_size
         sub_fs = max(11, int(main_fs * 0.70))
@@ -385,7 +500,7 @@ class DesktopLyricsWindow(Gtk.Window):
             padding: 8px 28px;
             margin: 0px 16px;
         }}
-        {unlocked_extra}
+        {drag_border_css}
         #header-bar {{
             padding-bottom: 4px;
             margin-bottom: 2px;
