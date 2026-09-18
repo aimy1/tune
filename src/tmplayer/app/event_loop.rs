@@ -24,7 +24,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::time::{Duration, Instant};
 
-const HELP_MODAL_ITEMS: usize = 15;
+const HELP_MODAL_ITEMS: usize = 17;
 
 fn sync_playlists_when_viewing_playback(app: &mut AppState) {
     if app.local_view_album_folder.is_some() && app.local_folder.is_some() {
@@ -1087,6 +1087,9 @@ async fn handle_action(
             } else {
                 app.close_overlay();
             }
+        }
+        Action::ExitSettings => {
+            app.close_overlay();
         }
         Action::TogglePlaylist => {
             if app.overlay == Overlay::Playlist {

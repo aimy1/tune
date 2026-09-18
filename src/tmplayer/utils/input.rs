@@ -16,6 +16,7 @@ pub enum Action {
     TogglePlaylist,
     Confirm,
     CloseOverlay,
+    ExitSettings,
 
     OpenSettingsModal,
     ToggleDesktopLyrics,
@@ -115,6 +116,11 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
     }
 
     if overlay == Overlay::BarSettingsModal || overlay == Overlay::DesktopLyricsSettingsModal {
+        if keybind_matches(&config.keybind_settings, ev)
+            || matches!(ev.code, KeyCode::Char('t') | KeyCode::Char('T'))
+        {
+            return Action::ExitSettings;
+        }
         return match ev.code {
             KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
@@ -159,23 +165,33 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
     }
 
     if overlay == Overlay::HelpModal {
+        if keybind_matches(&config.keybind_settings, ev)
+            || matches!(ev.code, KeyCode::Char('t') | KeyCode::Char('T'))
+        {
+            return Action::ExitSettings;
+        }
         if ev.modifiers.contains(KeyModifiers::CONTROL)
             && matches!(ev.code, KeyCode::Char('k') | KeyCode::Char('K'))
         {
             return Action::CloseOverlay;
         }
         return match ev.code {
-            KeyCode::Esc => Action::CloseOverlay,
+            KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
-            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => Action::ModalDown,
             _ => Action::None,
         };
     }
 
     if overlay == Overlay::AboutModal {
+        if keybind_matches(&config.keybind_settings, ev)
+            || matches!(ev.code, KeyCode::Char('t') | KeyCode::Char('T'))
+        {
+            return Action::ExitSettings;
+        }
         return match ev.code {
-            KeyCode::Esc | KeyCode::Enter => Action::CloseOverlay,
+            KeyCode::Esc | KeyCode::Enter | KeyCode::Backspace => Action::CloseOverlay,
             _ => Action::None,
         };
     }

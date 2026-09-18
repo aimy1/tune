@@ -359,24 +359,26 @@ fn format_setting_line(prefix: &str, key: &str, val: &str, width: u16) -> String
     format!(" {prefix}{key}{pad}{val} ")
 }
 
+fn base_bg_style(app: &AppState) -> Style {
+    Style::default()
+        .fg(app.theme.color_subtext())
+        .bg(app.theme.color_surface())
+}
+
 fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     let area = centered_rect(size, 70, 20);
     f.render_widget(ratatui::widgets::Clear, area);
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
+        .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 设置 ", " Settings "))
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
                 .add_modifier(Modifier::BOLD),
         )
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(base_bg_style(app));
     f.render_widget(block, area);
 
     let inner = area.inner(ratatui::layout::Margin {
@@ -477,8 +479,8 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
 
     let footer_text = lang_text(
         app,
-        "  ↑/k ↓/j: 导航  ←/h →/l: 调节/进入  Enter: 确认  Esc: 关闭",
-        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust/Enter  Enter: Confirm  Esc: Close",
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节/进入  Enter: 确认  Esc/t: 关闭",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust/Enter  Enter: Confirm  Esc/t: Close",
     );
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
@@ -544,18 +546,14 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
+        .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 播放设置 ", " Playback Settings "))
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
                 .add_modifier(Modifier::BOLD),
         )
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(base_bg_style(app));
     f.render_widget(block, area);
 
     let inner = area.inner(ratatui::layout::Margin {
@@ -725,7 +723,7 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
 }
 
 fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
-    let area = centered_rect(size, 70, 18);
+    let area = centered_rect(size, 70, 20);
     f.render_widget(ratatui::widgets::Clear, area);
 
     let title = lang_text(app, " 桌面歌词设置 ", " Desktop Lyrics Settings ");
@@ -738,11 +736,7 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
                 .fg(app.theme.color_accent())
                 .add_modifier(Modifier::BOLD),
         )
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(base_bg_style(app));
 
     f.render_widget(block, area);
 
@@ -820,7 +814,7 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
             opacity_str,
         ),
         (
-            lang_text(app, "恢复默认位置", "Reset Position"),
+            lang_text(app, "恢复默认位置", "Reset Default Position"),
             pos_str,
         ),
     ];
@@ -1001,18 +995,14 @@ fn render_about_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
+        .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 关于 ", " About "))
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
                 .add_modifier(Modifier::BOLD),
         )
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(base_bg_style(app));
     f.render_widget(block, area);
 
     let inner = area.inner(ratatui::layout::Margin {
@@ -1252,18 +1242,14 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
 
     let block = Block::default()
         .borders(Borders::ALL)
-        .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
+        .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 按键绑定 ", " Keybinds "))
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
                 .add_modifier(Modifier::BOLD),
         )
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(base_bg_style(app));
     f.render_widget(block, area);
 
     let inner = area.inner(ratatui::layout::Margin {
@@ -1334,6 +1320,14 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
             app.config.keybind_toggle_like_fullscreen.as_str(),
         ),
         (
+            lang_text(app, "个人中心", "Personal Center"),
+            app.config.keybind_personal_center.as_str(),
+        ),
+        (
+            lang_text(app, "主页", "Home"),
+            app.config.keybind_home.as_str(),
+        ),
+        (
             lang_text(app, "侧边栏歌单区切换", "Sidebar Playlist Section Switch"),
             "Ctrl+Up/Down",
         ),
@@ -1382,17 +1376,17 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
         rows[1],
     );
 
+    let footer_text = lang_text(
+        app,
+        "  ↑/k ↓/j: 导航  Esc/t: 返回上一级",
+        "  ↑/k ↓/j: Navigate  Esc/t: Back",
+    );
     f.render_widget(
-        Paragraph::new(lang_text(
-            app,
-            " Up/Down 浏览  Esc 返回 ",
-            " Up/Down browse  Esc back ",
-        ))
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        ),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }
