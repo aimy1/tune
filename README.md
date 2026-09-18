@@ -36,15 +36,11 @@
 ## 🎬 功能演示
 
 <div align="center">
-  <video controls width="100%" poster="assets/preview.png">
-    <source src="https://github.com/aimy1/tune/raw/main/exhibit.mp4" type="video/mp4">
-    <source src="exhibit.mp4" type="video/mp4">
-    <a href="https://github.com/aimy1/tune/blob/main/exhibit.mp4">
-      <img src="assets/preview.png" alt="Tune 演示视频 (Demo Video)" width="100%" />
-    </a>
-  </video>
+  <a href="exhibit.mp4">
+    <img src="assets/demo.gif" alt="Tune 播放与桌面歌词功能演示" width="100%" />
+  </a>
   <p align="center">
-    <em>▶️ 点击上方视频播放，或 <a href="https://github.com/aimy1/tune/blob/main/exhibit.mp4"><strong>在此处在线观看完整高清展示视频 (exhibit.mp4)</strong></a></em>
+    <em>🎬 <strong>动态演示实时预览</strong>（点击上方动图或 <a href="exhibit.mp4"><strong>此处在线播放完整高清展示视频 exhibit.mp4，含原声音频</strong></a>）</em>
   </p>
 </div>
 
