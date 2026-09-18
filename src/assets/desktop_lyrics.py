@@ -228,14 +228,8 @@ class DesktopLyricsWindow(Gtk.Window):
         self.box.pack_start(self.label_main, True, True, 0)
         self.box.pack_start(self.label_sub, True, True, 0)
         self.box.set_size_request(self.window_width, -1)
-        self.update_max_chars()
         self.add(self.box)
-
-    def update_max_chars(self):
-        char_factor = max(10, int(self.font_size * 0.62))
-        max_chars = max(40, int(self.window_width / char_factor))
-        self.label_main.set_max_width_chars(max_chars)
-        self.label_sub.set_max_width_chars(int(max_chars * 1.15))
+        self.update_max_chars()
 
         # CSS setup
         self.css_provider = Gtk.CssProvider()
@@ -253,6 +247,12 @@ class DesktopLyricsWindow(Gtk.Window):
 
         # Poll state every 50ms
         GLib.timeout_add(50, self.check_state)
+
+    def update_max_chars(self):
+        char_factor = max(10, int(self.font_size * 0.62))
+        max_chars = max(40, int(self.window_width / char_factor))
+        self.label_main.set_max_width_chars(max_chars)
+        self.label_sub.set_max_width_chars(int(max_chars * 1.15))
 
     def on_realize(self, widget):
         self.apply_click_through_state()
@@ -477,55 +477,62 @@ class DesktopLyricsWindow(Gtk.Window):
     def update_style(self):
         alpha = max(0.1, min(1.0, self.opacity / 100.0))
         if self.bg_style == "dark":
-            bg_css = f"background: rgba(10, 10, 15, {0.94 * alpha:.2f}); border: 1px solid rgba(80, 80, 110, {0.45 * alpha:.2f}); border-radius: 18px;"
+            bg_val = f"background: rgba(10, 10, 15, {0.94 * alpha:.2f});"
+            border_val = f"border: 1px solid rgba(80, 80, 110, {0.45 * alpha:.2f});"
+            radius_val = "border-radius: 18px;"
+            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
         elif self.bg_style == "light":
-            bg_css = f"background: rgba(22, 22, 34, {0.42 * alpha:.2f}); border: 1px solid rgba(255, 255, 255, {0.18 * alpha:.2f}); border-radius: 18px;"
+            bg_val = f"background: rgba(22, 22, 34, {0.42 * alpha:.2f});"
+            border_val = f"border: 1px solid rgba(255, 255, 255, {0.18 * alpha:.2f});"
+            radius_val = "border-radius: 18px;"
+            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
         elif self.bg_style == "transparent":
-            bg_css = "background: transparent; border: none; box-shadow: none;"
+            bg_val = "background: transparent;"
+            border_val = "border: none;"
+            radius_val = "border-radius: 0px;"
+            shadow_val = "box-shadow: none;"
         else: # translucent
-            bg_css = f"background: rgba(18, 18, 26, {0.78 * alpha:.2f}); border: 1px solid rgba(51, 204, 255, {0.35 * alpha:.2f}); border-radius: 18px;"
+            bg_val = f"background: rgba(18, 18, 26, {0.78 * alpha:.2f});"
+            border_val = f"border: 1px solid rgba(51, 204, 255, {0.35 * alpha:.2f});"
+            radius_val = "border-radius: 18px;"
+            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
+
+        hint_color = self.current_subtext
+        hint_weight = 600
 
         if self.dragging:
-            drag_border_css = f"""
-            #lyrics-container {{
-                border: 2px solid {self.current_accent} !important;
-                box-shadow: 0 0 20px {self.current_accent}, inset 0 0 10px rgba(255, 255, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.85) !important;
-                background: rgba(16, 16, 26, 0.95) !important;
-            }}
-            #drag-hint {{
-                color: {self.current_accent} !important;
-                font-weight: 700 !important;
-            }}
-            """
+            border_val = f"border: 2px solid {self.current_accent};"
+            bg_val = "background: rgba(16, 16, 26, 0.95);"
+            shadow_val = f"box-shadow: 0 0 20px {self.current_accent}, inset 0 0 10px rgba(255, 255, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.85);"
+            radius_val = "border-radius: 18px;"
+            hint_color = self.current_accent
+            hint_weight = 700
         elif not self.locked:
-            drag_border_css = f"""
-            #lyrics-container {{
-                border: 1.5px dashed {self.current_accent} !important;
-                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
-            }}
-            """
-        else:
-            drag_border_css = ""
+            border_val = f"border: 2px dashed {self.current_accent};"
+            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
+            radius_val = "border-radius: 18px;"
 
         main_fs = self.font_size
         sub_fs = max(11, int(main_fs * 0.70))
 
         css = f"""
         #lyrics-container {{
-            {bg_css}
+            {bg_val}
+            {border_val}
+            {radius_val}
+            {shadow_val}
             padding: 8px 28px;
             margin: 0px 16px;
         }}
-        {drag_border_css}
         #header-bar {{
             padding-bottom: 4px;
             margin-bottom: 2px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.12);
         }}
         #drag-hint {{
-            color: {self.current_subtext};
+            color: {hint_color};
             font-size: 11px;
-            font-weight: 600;
+            font-weight: {hint_weight};
         }}
         #btn-lock, #btn-reset {{
             background: rgba(40, 40, 60, 0.7);
@@ -556,7 +563,10 @@ class DesktopLyricsWindow(Gtk.Window):
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
         }}
         """
-        self.css_provider.load_from_data(css.encode('utf-8'))
+        try:
+            self.css_provider.load_from_data(css.encode('utf-8'))
+        except Exception as e:
+            sys.stderr.write(f"[tune-desktop-lyrics] CSS load error: {e}\n")
 
     def check_state(self):
         if not os.path.exists(self.state_path):
