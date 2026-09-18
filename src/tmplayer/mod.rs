@@ -263,6 +263,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         keybind_personal_center: host.keybind_personal_center.clone(),
         keybind_home: host.keybind_home.clone(),
         keybind_desktop_lyrics: host.keybind_desktop_lyrics.clone(),
+        keybind_desktop_lyrics_lock: host.keybind_desktop_lyrics_lock.clone(),
     }
 }
 

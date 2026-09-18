@@ -226,6 +226,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_desktop_lyrics")]
     pub keybind_desktop_lyrics: String,
+
+    #[serde(default = "default_keybind_desktop_lyrics_lock")]
+    pub keybind_desktop_lyrics_lock: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -551,6 +554,10 @@ fn default_keybind_desktop_lyrics() -> String {
     crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string()
 }
 
+fn default_keybind_desktop_lyrics_lock() -> String {
+    crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS_LOCK.to_string()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DesktopLyricsAlign {
@@ -803,6 +810,7 @@ impl Default for Config {
             keybind_personal_center: default_keybind_personal_center(),
             keybind_home: default_keybind_home(),
             keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
+            keybind_desktop_lyrics_lock: default_keybind_desktop_lyrics_lock(),
         }
     }
 }

@@ -20,6 +20,7 @@ pub enum Action {
 
     OpenSettingsModal,
     ToggleDesktopLyrics,
+    ToggleDesktopLyricsLock,
     OpenHelpModal,
     OpenVolumeModal,
     ToggleMute,
@@ -258,6 +259,10 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     if keybind_matches(&config.keybind_desktop_lyrics, ev) {
         return Action::ToggleDesktopLyrics;
+    }
+
+    if keybind_matches(&config.keybind_desktop_lyrics_lock, ev) {
+        return Action::ToggleDesktopLyricsLock;
     }
 
     if keybind_matches(&config.keybind_search_box, ev) {
@@ -571,5 +576,17 @@ mod tests {
         assert_eq!(map_key(make_ev(KeyCode::Left), Overlay::AboutModal, &config), Action::CloseOverlay);
         assert_eq!(map_key(make_ev(KeyCode::Enter), Overlay::AboutModal, &config), Action::CloseOverlay);
         assert_eq!(map_key(make_ev(KeyCode::Backspace), Overlay::AboutModal, &config), Action::CloseOverlay);
+    }
+
+    #[test]
+    fn test_desktop_lyrics_lock_keybind() {
+        let config = Config::default();
+        let ev = KeyEvent {
+            code: KeyCode::Char('s'),
+            modifiers: KeyModifiers::ALT,
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+        assert_eq!(map_key(ev, Overlay::None, &config), Action::ToggleDesktopLyricsLock);
     }
 }

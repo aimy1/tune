@@ -1355,6 +1355,10 @@ fn render_help_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
             lang_text(app, "桌面歌词", "Desktop Lyrics"),
             app.config.keybind_desktop_lyrics.as_str(),
         ),
+        (
+            lang_text(app, "桌面歌词锁定/拖动", "Desktop Lyrics Lock/Drag"),
+            app.config.keybind_desktop_lyrics_lock.as_str(),
+        ),
         (lang_text(app, "按键绑定", "Keybinds"), "Ctrl+K"),
     ];
 

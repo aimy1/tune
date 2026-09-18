@@ -174,6 +174,9 @@ pub struct Config {
 
     #[serde(default = "default_keybind_desktop_lyrics")]
     pub keybind_desktop_lyrics: String,
+
+    #[serde(default = "default_keybind_desktop_lyrics_lock")]
+    pub keybind_desktop_lyrics_lock: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -415,6 +418,10 @@ fn default_keybind_desktop_lyrics() -> String {
     "Alt+D".to_string()
 }
 
+fn default_keybind_desktop_lyrics_lock() -> String {
+    "Alt+S".to_string()
+}
+
 fn default_desktop_lyrics_locked() -> bool {
     true
 }
@@ -502,6 +509,7 @@ impl Default for Config {
             keybind_personal_center: default_keybind_personal_center(),
             keybind_home: default_keybind_home(),
             keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
+            keybind_desktop_lyrics_lock: default_keybind_desktop_lyrics_lock(),
         }
     }
 }

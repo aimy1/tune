@@ -1005,6 +1005,24 @@ async fn handle_action(
             app.config.desktop_lyrics = !app.config.desktop_lyrics;
             save_and_sync_host_config(app, host_bridge).await;
         }
+        Action::ToggleDesktopLyricsLock => {
+            app.config.desktop_lyrics_locked = !app.config.desktop_lyrics_locked;
+            let msg = if app.config.desktop_lyrics_locked {
+                if app.language == crate::data::config::Language::Zh {
+                    "桌面歌词已锁定 (不可拖动)"
+                } else {
+                    "Desktop lyrics locked (no drag)"
+                }
+            } else {
+                if app.language == crate::data::config::Language::Zh {
+                    "桌面歌词已解锁 (可拖动)"
+                } else {
+                    "Desktop lyrics unlocked (draggable)"
+                }
+            };
+            app.set_toast(msg);
+            save_and_sync_host_config(app, host_bridge).await;
+        }
         Action::SeekDelta(delta) => {
             let pos = app.player.position;
             let dur = app.player.track.duration;

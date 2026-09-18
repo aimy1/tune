@@ -64,7 +64,7 @@ const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 11;
 const SETTINGS_PLAYBACK_ITEMS: usize = 10;
 const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
-pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 20;
+pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 21;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
 const STARTUP_LOADING_MIN_VISIBLE_SECS: f32 = 0.75;
@@ -2584,6 +2584,19 @@ impl App {
         self.sync_desktop_lyrics();
     }
 
+    pub fn toggle_desktop_lyrics_lock(&mut self) {
+        self.config.desktop_lyrics_locked = !self.config.desktop_lyrics_locked;
+        let _ = self.config.save();
+        let msg = match (self.config.language, self.config.desktop_lyrics_locked) {
+            (Language::Zh, true) => "桌面歌词已锁定 (不可拖动)",
+            (Language::Zh, false) => "桌面歌词已解锁 (可拖动)",
+            (Language::En, true) => "Desktop lyrics locked (no drag)",
+            (Language::En, false) => "Desktop lyrics unlocked (draggable)",
+        };
+        self.set_runtime_status(msg);
+        self.sync_desktop_lyrics();
+    }
+
     pub fn fullscreen_playback_snapshot(&self) -> FullscreenPlaybackSnapshot {
         FullscreenPlaybackSnapshot {
             queue: self.playback_queue.clone(),
@@ -2867,6 +2880,7 @@ impl App {
             KeybindAction::PersonalCenter => self.open_personal_center_page().await,
             KeybindAction::Home => self.go_to_home_page(),
             KeybindAction::DesktopLyrics => self.toggle_desktop_lyrics(),
+            KeybindAction::DesktopLyricsLock => self.toggle_desktop_lyrics_lock(),
         }
     }
 
@@ -2985,6 +2999,7 @@ impl App {
             KeybindAction::PersonalCenter,
             KeybindAction::Home,
             KeybindAction::DesktopLyrics,
+            KeybindAction::DesktopLyricsLock,
         ];
 
         actions
@@ -3016,6 +3031,7 @@ impl App {
             KeybindAction::PersonalCenter => &self.config.keybind_personal_center,
             KeybindAction::Home => &self.config.keybind_home,
             KeybindAction::DesktopLyrics => &self.config.keybind_desktop_lyrics,
+            KeybindAction::DesktopLyricsLock => &self.config.keybind_desktop_lyrics_lock,
         }
     }
 
@@ -3041,6 +3057,7 @@ impl App {
             17 => Some(&mut self.config.keybind_personal_center),
             18 => Some(&mut self.config.keybind_home),
             19 => Some(&mut self.config.keybind_desktop_lyrics),
+            20 => Some(&mut self.config.keybind_desktop_lyrics_lock),
             _ => None,
         }
     }
@@ -3067,6 +3084,7 @@ impl App {
             17 => Some(self.config.keybind_personal_center.as_str()),
             18 => Some(self.config.keybind_home.as_str()),
             19 => Some(self.config.keybind_desktop_lyrics.as_str()),
+            20 => Some(self.config.keybind_desktop_lyrics_lock.as_str()),
             _ => None,
         }
     }
@@ -3112,6 +3130,7 @@ impl App {
             17 => self.lang_text("个人主页/个人中心", "Personal Center"),
             18 => self.lang_text("进入首页", "Home"),
             19 => self.lang_text("桌面歌词", "Desktop Lyrics"),
+            20 => self.lang_text("桌面歌词锁定/拖动", "Desktop Lyrics Lock/Drag"),
             _ => self.lang_text("未知", "Unknown"),
         }
     }
@@ -3141,6 +3160,7 @@ impl App {
         self.config.keybind_personal_center = DEFAULT_KEYBIND_PERSONAL_CENTER.to_string();
         self.config.keybind_home = DEFAULT_KEYBIND_HOME.to_string();
         self.config.keybind_desktop_lyrics = DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string();
+        self.config.keybind_desktop_lyrics_lock = DEFAULT_KEYBIND_DESKTOP_LYRICS_LOCK.to_string();
     }
 
     pub fn keybind_label_for_index(&self, index: usize) -> String {
@@ -3165,6 +3185,7 @@ impl App {
             17 => KeybindAction::PersonalCenter,
             18 => KeybindAction::Home,
             19 => KeybindAction::DesktopLyrics,
+            20 => KeybindAction::DesktopLyricsLock,
             _ => KeybindAction::SearchBox,
         });
         format!("{}: {}", self.keybind_name_for_index(index), value)
