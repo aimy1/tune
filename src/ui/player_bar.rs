@@ -79,7 +79,16 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
     let next_w = display_width(next_label) as u16;
     let mode_w = display_width(mode_symbol) as u16;
     let vol_w = display_width(&vol_label) as u16;
-    let controls_w = prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w;
+
+    let is_desktop_lyrics_active = app.config.desktop_lyrics;
+    let dlyric_text = match app.config.language {
+        crate::data::config::Language::Zh => "󰎆 词",
+        crate::data::config::Language::En => "󰎆 LRC",
+    };
+    let dlyric_label = format!("[{dlyric_text}]");
+    let dlyric_w = display_width(&dlyric_label) as u16;
+
+    let controls_w = prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w + 2 + dlyric_w;
 
     let spectrum =
         if app.now_playing.is_some() && app.playback_state != PlaybackRuntimeState::Stopped {
@@ -232,6 +241,28 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
             ),
         ]
     };
+    let dlyric_spans = if is_desktop_lyrics_active {
+        vec![
+            Span::styled("[", with_bar_bg(Style::default().fg(app.theme.color_subtext()))),
+            Span::styled(
+                dlyric_text,
+                with_bar_bg(
+                    Style::default()
+                        .fg(app.theme.color_accent())
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ),
+            Span::styled("]", with_bar_bg(Style::default().fg(app.theme.color_subtext()))),
+        ]
+    } else {
+        vec![
+            Span::styled(
+                dlyric_label,
+                with_bar_bg(Style::default().fg(app.theme.color_subtext())),
+            ),
+        ]
+    };
+
     let gap = Span::styled(" ", with_bar_bg(Style::default()));
     let gap2 = Span::styled("  ", with_bar_bg(Style::default()));
 
@@ -244,9 +275,11 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         next_span,
         gap2.clone(),
         mode_span,
-        gap2,
+        gap2.clone(),
     ];
     controls_spans.extend(vol_spans);
+    controls_spans.push(gap2);
+    controls_spans.extend(dlyric_spans);
 
     frame.render_widget(
         Paragraph::new(Line::from(controls_spans))
@@ -282,7 +315,7 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
 
     let mut hits = PlayerBarHitTargets::default();
 
-    let line_w = 1 + prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w;
+    let line_w = 1 + prev_w + 1 + play_w + 1 + next_w + 2 + mode_w + 2 + vol_w + 2 + dlyric_w;
     let line_start_x = controls_rect.x + controls_rect.width.saturating_sub(line_w) / 2;
 
     let prev_x = line_start_x.saturating_add(1);
@@ -322,6 +355,14 @@ pub fn draw_collapsed_player_bar(frame: &mut Frame, app: &mut App, area: Rect) {
         x: vol_x,
         y: top.y,
         width: vol_w,
+        height: 1,
+    });
+
+    let dlyric_x = vol_x.saturating_add(vol_w).saturating_add(2);
+    hits.desktop_lyrics = Some(HitRect {
+        x: dlyric_x,
+        y: top.y,
+        width: dlyric_w,
         height: 1,
     });
 
@@ -569,5 +610,23 @@ mod tests {
         assert_eq!(y, 18);
         assert_eq!(popup_w, 21);
         assert_eq!(popup_h, 1);
+    }
+
+    #[test]
+    fn test_player_bar_hits_desktop_lyrics() {
+        let mut hits = PlayerBarHitTargets::default();
+        assert!(hits.desktop_lyrics.is_none());
+        hits.desktop_lyrics = Some(HitRect {
+            x: 61,
+            y: 20,
+            width: 6,
+            height: 1,
+        });
+        let rect = hits.desktop_lyrics.unwrap();
+        assert!(rect.contains(61, 20));
+        assert!(rect.contains(66, 20));
+        assert!(!rect.contains(67, 20));
+        assert!(!rect.contains(60, 20));
+        assert!(!rect.contains(61, 19));
     }
 }

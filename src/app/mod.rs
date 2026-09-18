@@ -1515,6 +1515,7 @@ pub struct PlayerBarHitTargets {
     pub next: Option<HitRect>,
     pub repeat_mode: Option<HitRect>,
     pub volume: Option<HitRect>,
+    pub desktop_lyrics: Option<HitRect>,
     pub heart: Option<HitRect>,
     pub progress: Option<HitRect>,
 }
@@ -2078,6 +2079,12 @@ impl App {
                         return;
                     }
                 }
+                if let Some(rect) = self.player_bar_hits.desktop_lyrics {
+                    if rect.contains(col, row) {
+                        self.toggle_desktop_lyrics();
+                        return;
+                    }
+                }
                 if let Some(rect) = self.player_bar_hits.heart {
                     if rect.contains(col, row) {
                         let _ = self.toggle_like_hotkey().await;
@@ -2123,6 +2130,11 @@ impl App {
             || self
                 .player_bar_hits
                 .volume
+                .map(|rect| rect.contains(col, row))
+                .unwrap_or(false)
+            || self
+                .player_bar_hits
+                .desktop_lyrics
                 .map(|rect| rect.contains(col, row))
                 .unwrap_or(false)
             || self
