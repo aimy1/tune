@@ -153,6 +153,8 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
         desktop_lyrics_dual_line: app.config.desktop_lyrics_dual_line,
         desktop_lyrics_align: app.config.desktop_lyrics_align,
         desktop_lyrics_bg: app.config.desktop_lyrics_bg,
+        desktop_lyrics_width: app.config.desktop_lyrics_width,
+        desktop_lyrics_opacity: app.config.desktop_lyrics_opacity,
         desktop_lyrics_pos_x: app.config.desktop_lyrics_pos_x,
         desktop_lyrics_pos_y: app.config.desktop_lyrics_pos_y,
         audio_quality: match app.config.audio_quality {
@@ -217,6 +219,8 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
     app.config.desktop_lyrics_dual_line = config.desktop_lyrics_dual_line;
     app.config.desktop_lyrics_align = config.desktop_lyrics_align;
     app.config.desktop_lyrics_bg = config.desktop_lyrics_bg;
+    app.config.desktop_lyrics_width = config.desktop_lyrics_width;
+    app.config.desktop_lyrics_opacity = config.desktop_lyrics_opacity;
     app.config.desktop_lyrics_pos_x = config.desktop_lyrics_pos_x;
     app.config.desktop_lyrics_pos_y = config.desktop_lyrics_pos_y;
     app.vip_audio_unlocked = config.vip_audio_unlocked;
@@ -1072,7 +1076,7 @@ async fn handle_action(
                 app.playlist_slide_target_x = -(layout.left_width as i16);
                 app.overlay = Overlay::None;
             } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
-                app.overlay = Overlay::BarSettingsModal;
+                app.overlay = app.desktop_lyrics_settings_return_overlay;
             } else if app.overlay == Overlay::AcoustIdModal
                 || app.overlay == Overlay::BarSettingsModal
                 || app.overlay == Overlay::LocalAudioSettingsModal
@@ -1195,19 +1199,24 @@ async fn handle_action(
                     app.overlay = Overlay::BarSettingsModal;
                 }
                 5 => {
-                    app.help_keybind_selected = 0;
-                    app.overlay = Overlay::HelpModal;
+                    app.desktop_lyrics_settings_selected = 0;
+                    app.desktop_lyrics_settings_return_overlay = Overlay::SettingsModal;
+                    app.overlay = Overlay::DesktopLyricsSettingsModal;
                 }
                 6 => {
-                    apply_settings_delta(app, host_bridge, 1).await;
+                    app.help_keybind_selected = 0;
+                    app.overlay = Overlay::HelpModal;
                 }
                 7 => {
                     apply_settings_delta(app, host_bridge, 1).await;
                 }
                 8 => {
-                    app.set_toast("Logout is unavailable in fullscreen");
+                    apply_settings_delta(app, host_bridge, 1).await;
                 }
                 9 => {
+                    app.set_toast("Logout is unavailable in fullscreen");
+                }
+                10 => {
                     app.overlay = Overlay::AboutModal;
                 }
                 _ => {}
@@ -1254,6 +1263,7 @@ async fn handle_action(
                 }
                 8 => {
                     app.desktop_lyrics_settings_selected = 0;
+                    app.desktop_lyrics_settings_return_overlay = Overlay::BarSettingsModal;
                     app.overlay = Overlay::DesktopLyricsSettingsModal;
                 }
                 9 => {
@@ -1433,7 +1443,7 @@ async fn handle_action(
         }
         Action::ModalUp => {
             if app.overlay == Overlay::SettingsModal {
-                let count = 10;
+                let count = 11;
                 if app.settings_selected == 0 {
                     app.settings_selected = count - 1;
                 } else {
@@ -1447,7 +1457,7 @@ async fn handle_action(
                     app.bar_settings_selected -= 1;
                 }
             } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
-                let count = 7;
+                let count = 9;
                 if app.desktop_lyrics_settings_selected == 0 {
                     app.desktop_lyrics_settings_selected = count - 1;
                 } else {
@@ -1477,13 +1487,13 @@ async fn handle_action(
         }
         Action::ModalDown => {
             if app.overlay == Overlay::SettingsModal {
-                let count = 10;
+                let count = 11;
                 app.settings_selected = (app.settings_selected + 1) % count;
             } else if app.overlay == Overlay::BarSettingsModal {
                 let count = 12;
                 app.bar_settings_selected = (app.bar_settings_selected + 1) % count;
             } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
-                let count = 7;
+                let count = 9;
                 app.desktop_lyrics_settings_selected = (app.desktop_lyrics_settings_selected + 1) % count;
             } else if app.overlay == Overlay::LocalAudioSettingsModal {
                 let count = 5;
@@ -1569,7 +1579,27 @@ async fn handle_action(
         }
         Action::ModalRight => {
             if app.overlay == Overlay::SettingsModal {
-                apply_settings_delta(app, host_bridge, 1).await;
+                match app.settings_selected {
+                    4 => {
+                        app.bar_settings_selected = 0;
+                        app.overlay = Overlay::BarSettingsModal;
+                    }
+                    5 => {
+                        app.desktop_lyrics_settings_selected = 0;
+                        app.desktop_lyrics_settings_return_overlay = Overlay::SettingsModal;
+                        app.overlay = Overlay::DesktopLyricsSettingsModal;
+                    }
+                    6 => {
+                        app.help_keybind_selected = 0;
+                        app.overlay = Overlay::HelpModal;
+                    }
+                    10 => {
+                        app.overlay = Overlay::AboutModal;
+                    }
+                    _ => {
+                        apply_settings_delta(app, host_bridge, 1).await;
+                    }
+                }
             } else if app.overlay == Overlay::BarSettingsModal {
                 match app.bar_settings_selected {
                     0 => {
@@ -1608,6 +1638,7 @@ async fn handle_action(
                     }
                     8 => {
                         app.desktop_lyrics_settings_selected = 0;
+                        app.desktop_lyrics_settings_return_overlay = Overlay::BarSettingsModal;
                         app.overlay = Overlay::DesktopLyricsSettingsModal;
                     }
                     9 => {
@@ -2100,14 +2131,14 @@ async fn apply_settings_delta(
             }
         }
         // Show hints
-        6 => {
+        7 => {
             if delta != 0 {
                 app.config.show_hints = !app.config.show_hints;
                 save_and_sync_host_config(app, host_bridge).await;
             }
         }
         // Home more recommendations
-        7 => {
+        8 => {
             if delta != 0 {
                 app.config.home_more_recommend = !app.config.home_more_recommend;
                 save_and_sync_host_config(app, host_bridge).await;
@@ -2143,18 +2174,30 @@ async fn apply_desktop_lyrics_settings_delta(
             save_and_sync_host_config(app, host_bridge).await;
         }
         3 => {
-            app.config.desktop_lyrics_dual_line = !app.config.desktop_lyrics_dual_line;
+            app.config.desktop_lyrics_width = app.config.desktop_lyrics_width.cycle(delta);
             save_and_sync_host_config(app, host_bridge).await;
         }
         4 => {
-            app.config.desktop_lyrics_align = app.config.desktop_lyrics_align.cycle(delta);
+            app.config.desktop_lyrics_dual_line = !app.config.desktop_lyrics_dual_line;
             save_and_sync_host_config(app, host_bridge).await;
         }
         5 => {
-            app.config.desktop_lyrics_bg = app.config.desktop_lyrics_bg.cycle(delta);
+            app.config.desktop_lyrics_align = app.config.desktop_lyrics_align.cycle(delta);
             save_and_sync_host_config(app, host_bridge).await;
         }
         6 => {
+            app.config.desktop_lyrics_bg = app.config.desktop_lyrics_bg.cycle(delta);
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        7 => {
+            app.config.desktop_lyrics_opacity =
+                crate::data::config::cycle_desktop_lyrics_opacity(
+                    app.config.desktop_lyrics_opacity,
+                    delta,
+                );
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        8 => {
             app.config.desktop_lyrics_pos_x = None;
             app.config.desktop_lyrics_pos_y = None;
             save_and_sync_host_config(app, host_bridge).await;

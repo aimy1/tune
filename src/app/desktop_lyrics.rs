@@ -19,6 +19,8 @@ pub struct DesktopLyricPayload {
     pub dual_line: bool,
     pub align: String,
     pub bg: String,
+    pub width: u16,
+    pub opacity: u8,
     pub pos_x: Option<i32>,
     pub pos_y: Option<i32>,
 }
@@ -206,6 +208,8 @@ impl DesktopLyricsManager {
             "dual_line": payload.dual_line,
             "align": payload.align,
             "bg": payload.bg,
+            "width": payload.width,
+            "opacity": payload.opacity,
             "pos_x": payload.pos_x,
             "pos_y": payload.pos_y,
         });
@@ -265,6 +269,8 @@ mod tests {
             dual_line: true,
             align: "center".to_string(),
             bg: "translucent".to_string(),
+            width: 760,
+            opacity: 85,
             pos_x: Some(300),
             pos_y: Some(400),
         };
@@ -280,6 +286,8 @@ mod tests {
         assert!(json_str.contains("你好世界"));
         assert!(json_str.contains("#b4befe"));
         assert!(json_str.contains("\"font_size\":20"));
+        assert!(json_str.contains("\"width\":760"));
+        assert!(json_str.contains("\"opacity\":85"));
         assert!(json_str.contains("\"pos_x\":300"));
 
         let txt_str = fs::read_to_string(&manager.text_file).unwrap();

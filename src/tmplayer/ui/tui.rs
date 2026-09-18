@@ -424,6 +424,10 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
             "...".to_string(),
         ),
         (
+            lang_text(app, "桌面歌词设置", "Desktop Lyrics Settings"),
+            "...".to_string(),
+        ),
+        (
             lang_text(app, "按键绑定", "Keybinds"),
             "...".to_string(),
         ),
@@ -471,8 +475,17 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
         rows[1],
     );
 
+    let footer_text = lang_text(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节/进入  Enter: 确认  Esc: 关闭",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust/Enter  Enter: Confirm  Esc: Close",
+    );
     f.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }
@@ -704,14 +717,23 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
         rows[1],
     );
 
+    let footer_text = lang_text(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 切换/进入  Esc: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Toggle/Enter  Esc: Back",
+    );
     f.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }
 
 fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
-    let area = centered_rect(size, 70, 16);
+    let area = centered_rect(size, 70, 18);
     f.render_widget(ratatui::widgets::Clear, area);
 
     let title = lang_text(app, " 桌面歌词设置 ", " Desktop Lyrics Settings ");
@@ -760,6 +782,8 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
 
     let align_str = app.config.desktop_lyrics_align.display_name(app.language);
     let bg_str = app.config.desktop_lyrics_bg.display_name(app.language);
+    let width_str = app.config.desktop_lyrics_width.display_name(app.language);
+    let opacity_str = format!("{}%", app.config.desktop_lyrics_opacity);
 
     let pos_str = if let (Some(x), Some(y)) = (
         app.config.desktop_lyrics_pos_x,
@@ -784,6 +808,10 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
             format!("{}px", app.config.desktop_lyrics_font_size),
         ),
         (
+            lang_text(app, "窗口宽度", "Window Width"),
+            width_str.to_string(),
+        ),
+        (
             lang_text(app, "歌词行数", "Lyrics Lines"),
             dual_line_str.to_string(),
         ),
@@ -794,6 +822,10 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
         (
             lang_text(app, "背景样式", "Background Style"),
             bg_str.to_string(),
+        ),
+        (
+            lang_text(app, "背景透明度", "Background Opacity"),
+            opacity_str,
         ),
         (
             lang_text(app, "恢复默认位置", "Reset Position"),
@@ -827,8 +859,17 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
         rows[1],
     );
 
+    let footer_text = lang_text(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 确认/重置  Esc: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Confirm/Reset  Esc: Back",
+    );
     f.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }

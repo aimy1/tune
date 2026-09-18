@@ -92,6 +92,10 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
             "...".to_string(),
         ),
         (
+            l(app, "桌面歌词设置", "Desktop Lyrics Settings"),
+            "...".to_string(),
+        ),
+        (
             l(app, "按键绑定", "Keybinds"),
             "...".to_string(),
         ),
@@ -139,8 +143,17 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
         rows[1],
     );
 
+    let footer_text = l(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节/进入  Enter: 确认  Esc/t: 关闭",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust/Enter  Enter: Confirm  Esc/t: Close",
+    );
     frame.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }
@@ -256,8 +269,17 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
         rows[1],
     );
 
+    let footer_text = l(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 切换/进入  Esc: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Toggle/Enter  Esc: Back",
+    );
     frame.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }
@@ -300,6 +322,9 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
         l(app, "底部居中 (默认)", "Bottom Center (Default)").to_string()
     };
 
+    let width_str = app.config.desktop_lyrics_width.display_name(app.config.language);
+    let opacity_str = format!("{}%", app.config.desktop_lyrics_opacity);
+
     let raw_items = vec![
         (
             l(app, "桌面歌词开关", "Desktop Lyrics"),
@@ -314,6 +339,10 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
             format!("{}px", app.config.desktop_lyrics_font_size),
         ),
         (
+            l(app, "窗口宽度", "Window Width"),
+            width_str.to_string(),
+        ),
+        (
             l(app, "歌词行数", "Lyrics Lines"),
             dual_line_str.to_string(),
         ),
@@ -324,6 +353,10 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
         (
             l(app, "背景样式", "Background Style"),
             bg_str.to_string(),
+        ),
+        (
+            l(app, "背景透明度", "Background Opacity"),
+            opacity_str,
         ),
         (
             l(app, "恢复默认位置", "Reset Position"),
@@ -357,8 +390,17 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
         rows[1],
     );
 
+    let footer_text = l(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 确认/重置  Esc: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Confirm/Reset  Esc: Back",
+    );
     frame.render_widget(
-        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
         rows[2],
     );
 }

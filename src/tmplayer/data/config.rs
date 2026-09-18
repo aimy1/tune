@@ -1,4 +1,6 @@
-use crate::data::config::{DesktopLyricsAlign, DesktopLyricsBg, GraphicsProtocol};
+use crate::data::config::{
+    DesktopLyricsAlign, DesktopLyricsBg, DesktopLyricsWidth, GraphicsProtocol,
+};
 use crate::tmplayer::data::assets;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -52,6 +54,12 @@ pub struct Config {
 
     #[serde(default = "default_desktop_lyrics_bg")]
     pub desktop_lyrics_bg: DesktopLyricsBg,
+
+    #[serde(default = "default_desktop_lyrics_width")]
+    pub desktop_lyrics_width: DesktopLyricsWidth,
+
+    #[serde(default = "default_desktop_lyrics_opacity")]
+    pub desktop_lyrics_opacity: u8,
 
     #[serde(default)]
     pub desktop_lyrics_pos_x: Option<i32>,
@@ -427,6 +435,14 @@ fn default_desktop_lyrics_bg() -> DesktopLyricsBg {
     DesktopLyricsBg::Translucent
 }
 
+fn default_desktop_lyrics_width() -> DesktopLyricsWidth {
+    DesktopLyricsWidth::Standard
+}
+
+fn default_desktop_lyrics_opacity() -> u8 {
+    85
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -446,6 +462,8 @@ impl Default for Config {
             desktop_lyrics_dual_line: default_desktop_lyrics_dual_line(),
             desktop_lyrics_align: default_desktop_lyrics_align(),
             desktop_lyrics_bg: default_desktop_lyrics_bg(),
+            desktop_lyrics_width: default_desktop_lyrics_width(),
+            desktop_lyrics_opacity: default_desktop_lyrics_opacity(),
             desktop_lyrics_pos_x: None,
             desktop_lyrics_pos_y: None,
             kitty_cover_scale_percent: default_kitty_cover_scale_percent(),

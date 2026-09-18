@@ -61,9 +61,9 @@ const MAX_INPUT_LEN: usize = 64;
 const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
-const SETTINGS_ROOT_ITEMS: usize = 10;
+const SETTINGS_ROOT_ITEMS: usize = 11;
 const SETTINGS_PLAYBACK_ITEMS: usize = 12;
-const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 7;
+const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 20;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
@@ -1648,6 +1648,7 @@ pub struct App {
     pub settings_selected: usize,
     pub settings_playback_selected: usize,
     pub settings_desktop_lyrics_selected: usize,
+    pub settings_return_overlay: Overlay,
     pub settings_keybind_selected: usize,
     pub settings_keybind_rebinding: Option<usize>,
     pub session_cookie: Option<String>,
@@ -1773,6 +1774,7 @@ impl App {
             settings_selected: 0,
             settings_playback_selected: 0,
             settings_desktop_lyrics_selected: 0,
+            settings_return_overlay: Overlay::Settings,
             settings_keybind_selected: 0,
             settings_keybind_rebinding: None,
             session_cookie: None,
@@ -2548,6 +2550,8 @@ impl App {
             dual_line: self.config.desktop_lyrics_dual_line,
             align: self.config.desktop_lyrics_align.as_str().to_string(),
             bg: self.config.desktop_lyrics_bg.as_str().to_string(),
+            width: self.config.desktop_lyrics_width.pixel_width(),
+            opacity: self.config.desktop_lyrics_opacity,
             pos_x: self.config.desktop_lyrics_pos_x,
             pos_y: self.config.desktop_lyrics_pos_y,
         };
@@ -4325,24 +4329,44 @@ impl App {
 
     async fn handle_settings_root_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.close_overlay(),
+            KeyCode::Esc | KeyCode::Backspace => self.close_overlay(),
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
                     self.close_overlay();
                 }
             }
-            KeyCode::Up | KeyCode::BackTab => {
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
                 if self.settings_selected == 0 {
                     self.settings_selected = SETTINGS_ROOT_ITEMS - 1;
                 } else {
                     self.settings_selected -= 1;
                 }
             }
-            KeyCode::Down | KeyCode::Tab => {
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => {
                 self.settings_selected = (self.settings_selected + 1) % SETTINGS_ROOT_ITEMS;
             }
-            KeyCode::Left => self.apply_settings_root_delta(-1).await,
-            KeyCode::Right => self.apply_settings_root_delta(1).await,
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
+                self.apply_settings_root_delta(-1).await;
+            }
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => match self.settings_selected {
+                4 => {
+                    self.settings_playback_selected = 0;
+                    self.overlay = Some(Overlay::SettingsPlayback);
+                }
+                5 => {
+                    self.settings_desktop_lyrics_selected = 0;
+                    self.settings_return_overlay = Overlay::Settings;
+                    self.overlay = Some(Overlay::SettingsDesktopLyrics);
+                }
+                6 => {
+                    self.open_keybind_settings();
+                }
+                9 => self.logout_to_login().await,
+                10 => {
+                    self.overlay = Some(Overlay::SettingsAbout);
+                }
+                _ => self.apply_settings_root_delta(1).await,
+            },
             KeyCode::Enter => match self.settings_selected {
                 0..=3 => self.apply_settings_root_delta(1).await,
                 4 => {
@@ -4350,12 +4374,17 @@ impl App {
                     self.overlay = Some(Overlay::SettingsPlayback);
                 }
                 5 => {
+                    self.settings_desktop_lyrics_selected = 0;
+                    self.settings_return_overlay = Overlay::Settings;
+                    self.overlay = Some(Overlay::SettingsDesktopLyrics);
+                }
+                6 => {
                     self.open_keybind_settings();
                 }
-                6 => self.apply_settings_root_delta(1).await,
                 7 => self.apply_settings_root_delta(1).await,
-                8 => self.logout_to_login().await,
-                9 => {
+                8 => self.apply_settings_root_delta(1).await,
+                9 => self.logout_to_login().await,
+                10 => {
                     self.overlay = Some(Overlay::SettingsAbout);
                 }
                 _ => {}
@@ -4366,26 +4395,26 @@ impl App {
 
     fn handle_settings_playback_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.overlay = Some(Overlay::Settings),
+            KeyCode::Esc | KeyCode::Backspace => self.overlay = Some(Overlay::Settings),
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
                     self.close_overlay();
                 }
             }
-            KeyCode::Left => {
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.apply_settings_playback_delta(-1);
             }
-            KeyCode::Right | KeyCode::Enter => {
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
                 self.apply_settings_playback_delta(1);
             }
-            KeyCode::Up | KeyCode::BackTab => {
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
                 if self.settings_playback_selected == 0 {
                     self.settings_playback_selected = SETTINGS_PLAYBACK_ITEMS - 1;
                 } else {
                     self.settings_playback_selected -= 1;
                 }
             }
-            KeyCode::Down | KeyCode::Tab => {
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => {
                 self.settings_playback_selected =
                     (self.settings_playback_selected + 1) % SETTINGS_PLAYBACK_ITEMS;
             }
@@ -4395,26 +4424,26 @@ impl App {
 
     fn handle_settings_desktop_lyrics_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Esc => self.overlay = Some(Overlay::SettingsPlayback),
+            KeyCode::Esc | KeyCode::Backspace => self.overlay = Some(self.settings_return_overlay),
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
                     self.close_overlay();
                 }
             }
-            KeyCode::Left => {
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.apply_settings_desktop_lyrics_delta(-1);
             }
-            KeyCode::Right | KeyCode::Enter => {
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
                 self.apply_settings_desktop_lyrics_delta(1);
             }
-            KeyCode::Up | KeyCode::BackTab => {
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
                 if self.settings_desktop_lyrics_selected == 0 {
                     self.settings_desktop_lyrics_selected = SETTINGS_DESKTOP_LYRICS_ITEMS - 1;
                 } else {
                     self.settings_desktop_lyrics_selected -= 1;
                 }
             }
-            KeyCode::Down | KeyCode::Tab => {
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => {
                 self.settings_desktop_lyrics_selected =
                     (self.settings_desktop_lyrics_selected + 1) % SETTINGS_DESKTOP_LYRICS_ITEMS;
             }
@@ -4583,13 +4612,13 @@ impl App {
                     }
                 }
             }
-            6 => {
+            7 => {
                 if delta != 0 {
                     self.config.show_hints = !self.config.show_hints;
                     let _ = self.config.save();
                 }
             }
-            7 => {
+            8 => {
                 if delta != 0 {
                     self.config.home_more_recommend = !self.config.home_more_recommend;
                     let _ = self.config.save();
@@ -4658,6 +4687,7 @@ impl App {
             }
             8 => {
                 self.settings_desktop_lyrics_selected = 0;
+                self.settings_return_overlay = Overlay::SettingsPlayback;
                 self.overlay = Some(Overlay::SettingsDesktopLyrics);
             }
             9 => {
@@ -4708,21 +4738,35 @@ impl App {
                 self.sync_desktop_lyrics();
             }
             3 => {
-                self.config.desktop_lyrics_dual_line = !self.config.desktop_lyrics_dual_line;
+                self.config.desktop_lyrics_width = self.config.desktop_lyrics_width.cycle(delta);
                 let _ = self.config.save();
                 self.sync_desktop_lyrics();
             }
             4 => {
-                self.config.desktop_lyrics_align = self.config.desktop_lyrics_align.cycle(delta);
+                self.config.desktop_lyrics_dual_line = !self.config.desktop_lyrics_dual_line;
                 let _ = self.config.save();
                 self.sync_desktop_lyrics();
             }
             5 => {
-                self.config.desktop_lyrics_bg = self.config.desktop_lyrics_bg.cycle(delta);
+                self.config.desktop_lyrics_align = self.config.desktop_lyrics_align.cycle(delta);
                 let _ = self.config.save();
                 self.sync_desktop_lyrics();
             }
             6 => {
+                self.config.desktop_lyrics_bg = self.config.desktop_lyrics_bg.cycle(delta);
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            7 => {
+                self.config.desktop_lyrics_opacity =
+                    crate::data::config::cycle_desktop_lyrics_opacity(
+                        self.config.desktop_lyrics_opacity,
+                        delta,
+                    );
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            8 => {
                 self.config.desktop_lyrics_pos_x = None;
                 self.config.desktop_lyrics_pos_y = None;
                 let _ = self.config.save();
@@ -5237,6 +5281,8 @@ impl App {
             desktop_lyrics_dual_line: self.config.desktop_lyrics_dual_line,
             desktop_lyrics_align: self.config.desktop_lyrics_align,
             desktop_lyrics_bg: self.config.desktop_lyrics_bg,
+            desktop_lyrics_width: self.config.desktop_lyrics_width,
+            desktop_lyrics_opacity: self.config.desktop_lyrics_opacity,
             desktop_lyrics_pos_x: self.config.desktop_lyrics_pos_x,
             desktop_lyrics_pos_y: self.config.desktop_lyrics_pos_y,
             audio_quality: self.config.audio_quality,
@@ -5325,6 +5371,18 @@ impl App {
 
         if self.config.desktop_lyrics_bg != sync.desktop_lyrics_bg {
             self.config.desktop_lyrics_bg = sync.desktop_lyrics_bg;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_width != sync.desktop_lyrics_width {
+            self.config.desktop_lyrics_width = sync.desktop_lyrics_width;
+            changed = true;
+            desktop_lyrics_dirty = true;
+        }
+
+        if self.config.desktop_lyrics_opacity != sync.desktop_lyrics_opacity {
+            self.config.desktop_lyrics_opacity = sync.desktop_lyrics_opacity;
             changed = true;
             desktop_lyrics_dirty = true;
         }

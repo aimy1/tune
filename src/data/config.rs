@@ -134,6 +134,12 @@ pub struct Config {
     #[serde(default = "default_desktop_lyrics_bg")]
     pub desktop_lyrics_bg: DesktopLyricsBg,
 
+    #[serde(default = "default_desktop_lyrics_width")]
+    pub desktop_lyrics_width: DesktopLyricsWidth,
+
+    #[serde(default = "default_desktop_lyrics_opacity")]
+    pub desktop_lyrics_opacity: u8,
+
     #[serde(default)]
     pub desktop_lyrics_pos_x: Option<i32>,
 
@@ -632,6 +638,71 @@ impl DesktopLyricsBg {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum DesktopLyricsWidth {
+    Compact,
+    #[default]
+    Standard,
+    Wide,
+    UltraWide,
+}
+
+impl DesktopLyricsWidth {
+    pub fn pixel_width(&self) -> u16 {
+        match self {
+            Self::Compact => 560,
+            Self::Standard => 760,
+            Self::Wide => 960,
+            Self::UltraWide => 1200,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Standard => "standard",
+            Self::Wide => "wide",
+            Self::UltraWide => "ultrawide",
+        }
+    }
+
+    pub fn cycle(self, delta: i32) -> Self {
+        let items = [Self::Compact, Self::Standard, Self::Wide, Self::UltraWide];
+        let idx = match self {
+            Self::Compact => 0,
+            Self::Standard => 1,
+            Self::Wide => 2,
+            Self::UltraWide => 3,
+        };
+        let next = (idx as i32 + delta).rem_euclid(items.len() as i32) as usize;
+        items[next]
+    }
+
+    pub fn display_name(&self, lang: Language) -> &'static str {
+        match (self, lang) {
+            (Self::Compact, Language::Zh) => "紧凑 (560px)",
+            (Self::Compact, Language::En) => "Compact (560px)",
+            (Self::Standard, Language::Zh) => "标准 (760px)",
+            (Self::Standard, Language::En) => "Standard (760px)",
+            (Self::Wide, Language::Zh) => "宽屏 (960px)",
+            (Self::Wide, Language::En) => "Wide (960px)",
+            (Self::UltraWide, Language::Zh) => "超宽 (1200px)",
+            (Self::UltraWide, Language::En) => "Ultra-Wide (1200px)",
+        }
+    }
+}
+
+pub const DESKTOP_LYRICS_OPACITIES: [u8; 5] = [100, 85, 70, 50, 30];
+
+pub fn cycle_desktop_lyrics_opacity(current: u8, delta: i32) -> u8 {
+    let list = DESKTOP_LYRICS_OPACITIES;
+    let idx = list.iter().position(|&o| o == current).unwrap_or(1);
+    let next = (idx as i32 + delta).rem_euclid(list.len() as i32) as usize;
+    list[next]
+}
+
 pub const DESKTOP_LYRICS_FONT_SIZES: [u16; 6] = [16, 18, 20, 24, 28, 32];
 
 pub fn cycle_desktop_lyrics_font_size(current: u16, delta: i32) -> u16 {
@@ -659,6 +730,14 @@ fn default_desktop_lyrics_align() -> DesktopLyricsAlign {
 
 fn default_desktop_lyrics_bg() -> DesktopLyricsBg {
     DesktopLyricsBg::Translucent
+}
+
+fn default_desktop_lyrics_width() -> DesktopLyricsWidth {
+    DesktopLyricsWidth::Standard
+}
+
+fn default_desktop_lyrics_opacity() -> u8 {
+    85
 }
 
 impl Default for Config {
@@ -693,6 +772,8 @@ impl Default for Config {
             desktop_lyrics_dual_line: default_desktop_lyrics_dual_line(),
             desktop_lyrics_align: default_desktop_lyrics_align(),
             desktop_lyrics_bg: default_desktop_lyrics_bg(),
+            desktop_lyrics_width: default_desktop_lyrics_width(),
+            desktop_lyrics_opacity: default_desktop_lyrics_opacity(),
             desktop_lyrics_pos_x: None,
             desktop_lyrics_pos_y: None,
             audio_quality: default_audio_quality(),
@@ -883,6 +964,17 @@ mod tests {
         assert_eq!(DesktopLyricsBg::Transparent.cycle(1), DesktopLyricsBg::Translucent);
         assert_eq!(DesktopLyricsBg::Dark.as_str(), "dark");
 
+        // Width
+        assert_eq!(DesktopLyricsWidth::Standard.cycle(1), DesktopLyricsWidth::Wide);
+        assert_eq!(DesktopLyricsWidth::UltraWide.cycle(1), DesktopLyricsWidth::Compact);
+        assert_eq!(DesktopLyricsWidth::Compact.cycle(-1), DesktopLyricsWidth::UltraWide);
+        assert_eq!(DesktopLyricsWidth::Wide.pixel_width(), 960);
+
+        // Opacity
+        assert_eq!(cycle_desktop_lyrics_opacity(85, 1), 70);
+        assert_eq!(cycle_desktop_lyrics_opacity(30, 1), 100);
+        assert_eq!(cycle_desktop_lyrics_opacity(100, -1), 30);
+
         // Serde roundtrip
         let mut cfg = Config::default();
         cfg.desktop_lyrics = true;
@@ -891,6 +983,8 @@ mod tests {
         cfg.desktop_lyrics_dual_line = false;
         cfg.desktop_lyrics_align = DesktopLyricsAlign::Right;
         cfg.desktop_lyrics_bg = DesktopLyricsBg::Dark;
+        cfg.desktop_lyrics_width = DesktopLyricsWidth::Wide;
+        cfg.desktop_lyrics_opacity = 70;
         cfg.desktop_lyrics_pos_x = Some(100);
         cfg.desktop_lyrics_pos_y = Some(200);
 
@@ -902,6 +996,8 @@ mod tests {
         assert!(!parsed.desktop_lyrics_dual_line);
         assert_eq!(parsed.desktop_lyrics_align, DesktopLyricsAlign::Right);
         assert_eq!(parsed.desktop_lyrics_bg, DesktopLyricsBg::Dark);
+        assert_eq!(parsed.desktop_lyrics_width, DesktopLyricsWidth::Wide);
+        assert_eq!(parsed.desktop_lyrics_opacity, 70);
         assert_eq!(parsed.desktop_lyrics_pos_x, Some(100));
         assert_eq!(parsed.desktop_lyrics_pos_y, Some(200));
 
@@ -914,6 +1010,8 @@ mod tests {
         assert!(legacy.desktop_lyrics_dual_line);
         assert_eq!(legacy.desktop_lyrics_align, DesktopLyricsAlign::Center);
         assert_eq!(legacy.desktop_lyrics_bg, DesktopLyricsBg::Translucent);
+        assert_eq!(legacy.desktop_lyrics_width, DesktopLyricsWidth::Standard);
+        assert_eq!(legacy.desktop_lyrics_opacity, 85);
         assert_eq!(legacy.desktop_lyrics_pos_x, None);
         assert_eq!(legacy.desktop_lyrics_pos_y, None);
     }

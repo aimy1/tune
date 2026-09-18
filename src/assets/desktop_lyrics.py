@@ -130,6 +130,8 @@ class DesktopLyricsWindow(Gtk.Window):
         # Settings
         self.locked = True
         self.font_size = 20
+        self.window_width = 760
+        self.opacity = 85
         self.dual_line = True
         self.align = "center"
         self.bg_style = "translucent"
@@ -225,7 +227,15 @@ class DesktopLyricsWindow(Gtk.Window):
 
         self.box.pack_start(self.label_main, True, True, 0)
         self.box.pack_start(self.label_sub, True, True, 0)
+        self.box.set_size_request(self.window_width, -1)
+        self.update_max_chars()
         self.add(self.box)
+
+    def update_max_chars(self):
+        char_factor = max(10, int(self.font_size * 0.62))
+        max_chars = max(40, int(self.window_width / char_factor))
+        self.label_main.set_max_width_chars(max_chars)
+        self.label_sub.set_max_width_chars(int(max_chars * 1.15))
 
         # CSS setup
         self.css_provider = Gtk.CssProvider()
@@ -428,11 +438,16 @@ class DesktopLyricsWindow(Gtk.Window):
         # Find target monitor for the cursor position
         monitor, _ = find_monitor_for_point(display, cur_mouse[0], cur_mouse[1])
         self.apply_custom_position(target_x, target_y, target_monitor=monitor)
+
+        # Update real-time monitor & coordinate feedback
+        mon_name = monitor.get_model() if monitor and hasattr(monitor, 'get_model') and monitor.get_model() else "屏幕"
+        self.drag_hint.set_text(f"⠿ {mon_name} [{int(target_x)}, {int(target_y)}]")
         return True
 
     def on_button_release(self, widget, event):
         if event.button == 1 and self.dragging:
             self.dragging = False
+            self.drag_hint.set_text("⠿ 拖动调整位置")
             self.update_style()
             gdk_win = self.get_window()
             if gdk_win:
@@ -460,14 +475,15 @@ class DesktopLyricsWindow(Gtk.Window):
             sys.stderr.write(f"[tune-desktop-lyrics] Failed to write pos file: {e}\n")
 
     def update_style(self):
+        alpha = max(0.1, min(1.0, self.opacity / 100.0))
         if self.bg_style == "dark":
-            bg_css = "background: rgba(10, 10, 15, 0.94); border: 1px solid rgba(80, 80, 110, 0.45); border-radius: 18px;"
+            bg_css = f"background: rgba(10, 10, 15, {0.94 * alpha:.2f}); border: 1px solid rgba(80, 80, 110, {0.45 * alpha:.2f}); border-radius: 18px;"
         elif self.bg_style == "light":
-            bg_css = "background: rgba(22, 22, 34, 0.42); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 18px;"
+            bg_css = f"background: rgba(22, 22, 34, {0.42 * alpha:.2f}); border: 1px solid rgba(255, 255, 255, {0.18 * alpha:.2f}); border-radius: 18px;"
         elif self.bg_style == "transparent":
             bg_css = "background: transparent; border: none; box-shadow: none;"
         else: # translucent
-            bg_css = f"background: rgba(18, 18, 26, 0.78); border: 1px solid rgba(51, 204, 255, 0.35); border-radius: 18px;"
+            bg_css = f"background: rgba(18, 18, 26, {0.78 * alpha:.2f}); border: 1px solid rgba(51, 204, 255, {0.35 * alpha:.2f}); border-radius: 18px;"
 
         if self.dragging:
             drag_border_css = f"""
@@ -575,8 +591,10 @@ class DesktopLyricsWindow(Gtk.Window):
             if locked != self.locked:
                 self.set_locked_state(locked)
 
-            # Font size, dual line, align, bg
+            # Font size, width, opacity, dual line, align, bg
             font_size = data.get('font_size', 20)
+            width = data.get('width', 760)
+            opacity = data.get('opacity', 85)
             dual_line = data.get('dual_line', True)
             align = data.get('align', 'center')
             bg = data.get('bg', 'translucent')
@@ -589,9 +607,17 @@ class DesktopLyricsWindow(Gtk.Window):
                 self.current_subtext = subtext
                 style_changed = True
 
-            if font_size != self.font_size or bg != self.bg_style:
+            if font_size != self.font_size or bg != self.bg_style or opacity != self.opacity:
                 self.font_size = font_size
                 self.bg_style = bg
+                self.opacity = opacity
+                self.update_max_chars()
+                style_changed = True
+
+            if width != self.window_width:
+                self.window_width = width
+                self.box.set_size_request(self.window_width, -1)
+                self.update_max_chars()
                 style_changed = True
 
             if style_changed:

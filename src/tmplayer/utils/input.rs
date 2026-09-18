@@ -103,25 +103,25 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
             return Action::CloseOverlay;
         }
         return match ev.code {
-            KeyCode::Esc => Action::CloseOverlay,
+            KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
             KeyCode::Char('t') | KeyCode::Char('T') => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
-            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
-            KeyCode::Left => Action::ModalLeft,
-            KeyCode::Right => Action::ModalRight,
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => Action::ModalDown,
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => Action::ModalLeft,
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => Action::ModalRight,
             _ => Action::None,
         };
     }
 
     if overlay == Overlay::BarSettingsModal || overlay == Overlay::DesktopLyricsSettingsModal {
         return match ev.code {
-            KeyCode::Esc => Action::CloseOverlay,
+            KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
             KeyCode::Enter => Action::Confirm,
-            KeyCode::Up | KeyCode::BackTab => Action::ModalUp,
-            KeyCode::Down | KeyCode::Tab => Action::ModalDown,
-            KeyCode::Left => Action::ModalLeft,
-            KeyCode::Right => Action::ModalRight,
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => Action::ModalUp,
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => Action::ModalDown,
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => Action::ModalLeft,
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => Action::ModalRight,
             _ => Action::None,
         };
     }
