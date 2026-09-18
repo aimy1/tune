@@ -36,12 +36,7 @@
 ## 🎬 功能演示
 
 <div align="center">
-  <a href="exhibit.mp4">
-    <img src="assets/demo.gif" alt="Tune 播放与桌面歌词功能演示" width="100%" />
-  </a>
-  <p align="center">
-    <em>🎬 <strong>动态演示实时预览</strong>（点击上方动图或 <a href="exhibit.mp4"><strong>此处在线播放完整高清展示视频 exhibit.mp4，含原声音频</strong></a>）</em>
-  </p>
+  <img src="assets/demo.gif" alt="Tune 播放与桌面歌词功能演示" width="100%" />
 </div>
 
 ---
