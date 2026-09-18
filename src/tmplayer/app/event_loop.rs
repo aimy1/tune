@@ -5,7 +5,6 @@ use crate::tmplayer::app::state::{
 use crate::tmplayer::audio::cava::{CavaChannels, CavaConfig, CavaRunner};
 use crate::tmplayer::data::config::{AudioQuality, BarChannels, BarNumber, VisualizeMode};
 use crate::tmplayer::data::theme_loader::ThemeLoader;
-use crate::tmplayer::ui::theme::ThemeName;
 use crate::tmplayer::ui::tui::{lang_text, Tui, UiLayout};
 use crate::tmplayer::utils::input::{Action, map_key, map_mouse};
 use crate::tmplayer::utils::system_volume::SystemVolume;
@@ -198,14 +197,23 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
             BarChannels::Mono => crate::data::config::BarChannels::Mono,
         },
         bar_channel_reverse: app.config.bar_channel_reverse,
+        palette: app.config.palette.clone(),
     }
 }
 
 fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
+    let mut theme_dirty = false;
+    if app.config.palette != config.palette {
+        app.config.palette = config.palette;
+        theme_dirty = true;
+    }
     if app.config.theme != config.theme {
-        if let Ok(theme) = ThemeLoader::load(&config.theme) {
+        app.config.theme = config.theme;
+        theme_dirty = true;
+    }
+    if theme_dirty {
+        if let Ok(theme) = ThemeLoader::load_with_overrides(&app.config.theme, app.config.palette.as_ref()) {
             app.theme = theme;
-            app.config.theme = config.theme;
         }
     }
 
@@ -2022,39 +2030,6 @@ async fn handle_action(
     Ok(())
 }
 
-fn themes() -> [ThemeName; 5] {
-    [
-        ThemeName::System,
-        ThemeName::Latte,
-        ThemeName::Frappe,
-        ThemeName::Macchiato,
-        ThemeName::Mocha,
-    ]
-}
-
-fn theme_count() -> usize {
-    themes().len()
-}
-
-fn theme_index(name: ThemeName) -> usize {
-    themes().iter().position(|&t| t == name).unwrap_or(0)
-}
-
-fn theme_by_index(idx: usize) -> ThemeName {
-    let t = themes();
-    t[idx.min(t.len().saturating_sub(1))]
-}
-
-fn theme_key(name: ThemeName) -> &'static str {
-    match name {
-        ThemeName::System => "system",
-        ThemeName::Latte => "latte",
-        ThemeName::Frappe => "frappe",
-        ThemeName::Macchiato => "macchiato",
-        ThemeName::Mocha => "mocha",
-    }
-}
-
 fn apply_remote_fetch_results(
     app: &mut AppState,
     mode_manager: &mut ModeManager,
@@ -2088,17 +2063,20 @@ async fn apply_settings_delta(
     match app.settings_selected {
         // Theme
         0 => {
-            let count = theme_count() as i32;
+            let available = ThemeLoader::available_themes();
+            let count = available.len() as i32;
             if count <= 0 {
                 return;
             }
-            let cur = theme_index(app.theme.name) as i32;
+            let cur = available
+                .iter()
+                .position(|t| t.eq_ignore_ascii_case(&app.config.theme))
+                .unwrap_or(0) as i32;
             let next = (cur + delta).rem_euclid(count) as usize;
-            let name = theme_by_index(next);
-            let key = theme_key(name);
-            if let Ok(theme) = ThemeLoader::load(key) {
+            let key = &available[next];
+            if let Ok(theme) = ThemeLoader::load_with_overrides(key, app.config.palette.as_ref()) {
                 app.theme = theme;
-                app.config.theme = key.to_string();
+                app.config.theme = key.clone();
                 save_and_sync_host_config(app, host_bridge).await;
             } else {
                 app.set_toast("Theme load error");

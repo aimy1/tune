@@ -229,6 +229,43 @@ pub struct Config {
 
     #[serde(default = "default_keybind_desktop_lyrics_lock")]
     pub keybind_desktop_lyrics_lock: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<CustomPaletteConfig>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CustomPaletteConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtext: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub surface: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub buff: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent2: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent3: Option<String>,
+}
+
+impl CustomPaletteConfig {
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.text.is_none()
+            && self.subtext.is_none()
+            && self.base.is_none()
+            && self.surface.is_none()
+            && self.buff.is_none()
+            && self.accent.is_none()
+            && self.accent2.is_none()
+            && self.accent3.is_none()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -811,6 +848,7 @@ impl Default for Config {
             keybind_home: default_keybind_home(),
             keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
             keybind_desktop_lyrics_lock: default_keybind_desktop_lyrics_lock(),
+            palette: None,
         }
     }
 }
@@ -1022,5 +1060,31 @@ mod tests {
         assert_eq!(legacy.desktop_lyrics_opacity, 85);
         assert_eq!(legacy.desktop_lyrics_pos_x, None);
         assert_eq!(legacy.desktop_lyrics_pos_y, None);
+    }
+
+    #[test]
+    fn test_custom_palette_config_serde() {
+        let toml_str = r##"
+theme = "hyprland"
+ui_fps = 30
+spectrum_hz = 60
+mpris_poll_ms = 100
+visualize = "bars"
+
+[palette]
+accent = "#FF007F"
+text = "#E0E0E0"
+"##;
+        let parsed: super::Config = toml::from_str(toml_str).unwrap();
+        let palette = parsed.palette.as_ref().expect("palette should be present");
+        assert_eq!(palette.accent.as_deref(), Some("#FF007F"));
+        assert_eq!(palette.text.as_deref(), Some("#E0E0E0"));
+        assert_eq!(palette.base, None);
+        assert_eq!(palette.subtext, None);
+        assert!(!palette.is_empty());
+
+        let reserialized = toml::to_string(&parsed).unwrap();
+        assert!(reserialized.contains("[palette]"));
+        assert!(reserialized.contains("accent = \"#FF007F\""));
     }
 }

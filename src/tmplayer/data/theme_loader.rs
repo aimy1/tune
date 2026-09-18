@@ -1,64 +1,198 @@
+use crate::data::config::CustomPaletteConfig;
 use crate::tmplayer::data::assets;
 use crate::tmplayer::ui::theme::{Theme, ThemeName, ThemePalette, detect_color_capability};
 use anyhow::Result;
 use serde::Deserialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct ThemeLoader;
 
 #[derive(Debug, Deserialize)]
 struct ThemeToml {
-    text: String,
-    subtext: String,
-    base: String,
-    surface: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    name: Option<String>,
+    #[serde(default)]
+    text: Option<String>,
+    #[serde(default)]
+    subtext: Option<String>,
+    #[serde(default)]
+    base: Option<String>,
+    #[serde(default)]
+    surface: Option<String>,
+    #[serde(default)]
     buff: Option<String>,
-    accent: String,
-    accent2: String,
-    accent3: String,
+    #[serde(default)]
+    accent: Option<String>,
+    #[serde(default)]
+    accent2: Option<String>,
+    #[serde(default)]
+    accent3: Option<String>,
 }
 
 impl ThemeLoader {
+    #[allow(dead_code)]
     pub fn load(name: &str) -> Result<Theme> {
+        Self::load_with_overrides(name, None)
+    }
+
+    pub fn load_with_overrides(
+        spec: &str,
+        overrides: Option<&CustomPaletteConfig>,
+    ) -> Result<Theme> {
         let _ = assets::ensure_assets_ready();
-        let name = ThemeName::from_str_or_system(name);
-
-        let rel = match name {
-            ThemeName::System => PathBuf::from("themes/system.toml"),
-            ThemeName::Latte => PathBuf::from("themes/catppuccin_latte.toml"),
-            ThemeName::Frappe => PathBuf::from("themes/catppuccin_frappe.toml"),
-            ThemeName::Macchiato => PathBuf::from("themes/catppuccin_macchiato.toml"),
-            ThemeName::Mocha => PathBuf::from("themes/catppuccin_mocha.toml"),
-        };
-
-        let path = assets::resolve_asset_path(&rel);
+        let path = resolve_theme_file(spec);
         let raw = fs::read_to_string(&path)?;
         let t: ThemeToml = toml::from_str(&raw)?;
+
+        let default_base = (17, 17, 27);
+        let default_surface = (24, 24, 37);
+        let default_text = (242, 244, 248);
+        let default_subtext = (148, 156, 187);
+        let default_accent = (51, 204, 255);
+        let default_accent2 = (0, 255, 153);
+        let default_accent3 = (203, 166, 247);
+
+        let surface = t
+            .surface
+            .as_deref()
+            .map(parse_hex)
+            .unwrap_or(default_surface);
+
         let buff_hex = if let Some(buff) = t.buff.clone() {
             buff
-        } else {
-            let generated = derive_buff_hex(&t.surface);
+        } else if let Some(ref s) = t.surface {
+            let generated = derive_buff_hex(s);
             let upgraded = inject_buff_entry(&raw, &generated);
             let _ = fs::write(&path, upgraded);
             generated
+        } else {
+            format!(
+                "#{:02X}{:02X}{:02X}",
+                surface.0.saturating_add(10),
+                surface.1.saturating_add(10),
+                surface.2.saturating_add(10)
+            )
         };
+
+        let mut palette = ThemePalette {
+            text: t.text.as_deref().map(parse_hex).unwrap_or(default_text),
+            subtext: t
+                .subtext
+                .as_deref()
+                .map(parse_hex)
+                .unwrap_or(default_subtext),
+            base: t.base.as_deref().map(parse_hex).unwrap_or(default_base),
+            surface,
+            buff: parse_hex(&buff_hex),
+            accent: t
+                .accent
+                .as_deref()
+                .map(parse_hex)
+                .unwrap_or(default_accent),
+            accent2: t
+                .accent2
+                .as_deref()
+                .map(parse_hex)
+                .unwrap_or(default_accent2),
+            accent3: t
+                .accent3
+                .as_deref()
+                .map(parse_hex)
+                .unwrap_or(default_accent3),
+        };
+
+        if let Some(ov) = overrides {
+            palette.apply_overrides(ov);
+        }
+
+        let name = ThemeName::from_str_or_system(spec);
         let capability = detect_color_capability();
+
         Ok(Theme {
             name,
-            palette: ThemePalette {
-                text: parse_hex(&t.text),
-                subtext: parse_hex(&t.subtext),
-                base: parse_hex(&t.base),
-                surface: parse_hex(&t.surface),
-                buff: parse_hex(&buff_hex),
-                accent: parse_hex(&t.accent),
-                accent2: parse_hex(&t.accent2),
-                accent3: parse_hex(&t.accent3),
-            },
+            palette,
             capability,
         })
     }
+
+    pub fn available_themes() -> Vec<String> {
+        let _ = assets::ensure_assets_ready();
+        let mut themes = vec![
+            "system".to_string(),
+            "hyprland".to_string(),
+            "latte".to_string(),
+            "frappe".to_string(),
+            "macchiato".to_string(),
+            "mocha".to_string(),
+        ];
+
+        let themes_dir = assets::resolve_asset_path(Path::new("themes"));
+        if let Ok(entries) = fs::read_dir(&themes_dir) {
+            let mut custom_themes = Vec::new();
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file()
+                    && path.extension().and_then(|ext| ext.to_str()) == Some("toml")
+                {
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        let canonical = match stem {
+                            "system" | "hyprland" => continue,
+                            "catppuccin_latte" => continue,
+                            "catppuccin_frappe" => continue,
+                            "catppuccin_macchiato" => continue,
+                            "catppuccin_mocha" => continue,
+                            other => other.to_string(),
+                        };
+                        if !themes.contains(&canonical) && !custom_themes.contains(&canonical) {
+                            custom_themes.push(canonical);
+                        }
+                    }
+                }
+            }
+            custom_themes.sort();
+            themes.extend(custom_themes);
+        }
+
+        themes
+    }
+}
+
+fn resolve_theme_file(spec: &str) -> PathBuf {
+    let direct = PathBuf::from(spec);
+    if direct.is_file() {
+        return direct;
+    }
+    let as_asset = assets::resolve_asset_path(&direct);
+    if as_asset.is_file() {
+        return as_asset;
+    }
+
+    let built_in_rel = match spec.to_lowercase().as_str() {
+        "system" => Some("themes/system.toml"),
+        "hyprland" => Some("themes/hyprland.toml"),
+        "latte" | "catppuccin_latte" => Some("themes/catppuccin_latte.toml"),
+        "frappe" | "catppuccin_frappe" => Some("themes/catppuccin_frappe.toml"),
+        "macchiato" | "catppuccin_macchiato" => Some("themes/catppuccin_macchiato.toml"),
+        "mocha" | "catppuccin_mocha" => Some("themes/catppuccin_mocha.toml"),
+        _ => None,
+    };
+
+    if let Some(rel) = built_in_rel {
+        let p = assets::resolve_asset_path(Path::new(rel));
+        if p.is_file() {
+            return p;
+        }
+    }
+
+    let custom_file = format!("themes/{}.toml", spec);
+    let custom_p = assets::resolve_asset_path(Path::new(&custom_file));
+    if custom_p.is_file() {
+        return custom_p;
+    }
+
+    assets::resolve_asset_path(Path::new("themes/system.toml"))
 }
 
 fn parse_hex(s: &str) -> (u8, u8, u8) {

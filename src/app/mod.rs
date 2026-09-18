@@ -4608,16 +4608,19 @@ impl App {
     async fn apply_settings_root_delta(&mut self, delta: i32) {
         match self.settings_selected {
             0 => {
-                let themes = ["system", "latte", "frappe", "macchiato", "mocha"];
+                let themes = ThemeLoader::available_themes();
+                if themes.is_empty() {
+                    return;
+                }
                 let current = themes
                     .iter()
                     .position(|name| name.eq_ignore_ascii_case(self.config.theme.as_str()))
                     .unwrap_or(0) as i32;
                 let next = (current + delta).rem_euclid(themes.len() as i32) as usize;
-                let next_name = themes[next];
-                if let Ok(theme) = ThemeLoader::load(next_name) {
+                let next_name = &themes[next];
+                if let Ok(theme) = ThemeLoader::load_with_overrides(next_name, self.config.palette.as_ref()) {
                     self.theme = theme;
-                    self.config.theme = next_name.to_string();
+                    self.config.theme = next_name.clone();
                     let _ = self.config.save();
                 }
             }
@@ -5323,6 +5326,7 @@ impl App {
             bar_number: self.config.bar_number,
             bar_channels: self.config.bar_channels,
             bar_channel_reverse: self.config.bar_channel_reverse,
+            palette: self.config.palette.clone(),
         }
     }
 
@@ -5330,11 +5334,22 @@ impl App {
         let mut changed = false;
         let mut home_more_recommend_changed = false;
 
+        let mut theme_dirty = false;
+        if self.config.palette != sync.palette {
+            self.config.palette = sync.palette;
+            theme_dirty = true;
+            changed = true;
+        }
+
         if self.config.theme != sync.theme {
-            if let Ok(theme) = ThemeLoader::load(&sync.theme) {
+            self.config.theme = sync.theme;
+            theme_dirty = true;
+            changed = true;
+        }
+
+        if theme_dirty {
+            if let Ok(theme) = ThemeLoader::load_with_overrides(&self.config.theme, self.config.palette.as_ref()) {
                 self.theme = theme;
-                self.config.theme = sync.theme;
-                changed = true;
             }
         }
 

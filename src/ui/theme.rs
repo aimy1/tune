@@ -8,7 +8,7 @@ pub enum ColorCapability {
     NoColor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ThemeName {
     System,
     Hyprland,
@@ -16,6 +16,7 @@ pub enum ThemeName {
     Frappe,
     Macchiato,
     Mocha,
+    Custom(String),
 }
 
 impl ThemeName {
@@ -26,12 +27,27 @@ impl ThemeName {
             "frappe" => Self::Frappe,
             "macchiato" => Self::Macchiato,
             "mocha" => Self::Mocha,
+            "system" => Self::System,
+            other if !other.is_empty() => Self::Custom(raw.to_string()),
             _ => Self::System,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::System => "system",
+            Self::Hyprland => "hyprland",
+            Self::Latte => "latte",
+            Self::Frappe => "frappe",
+            Self::Macchiato => "macchiato",
+            Self::Mocha => "mocha",
+            Self::Custom(s) => s.as_str(),
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ThemePalette {
     pub text: (u8, u8, u8),
     pub subtext: (u8, u8, u8),
@@ -43,7 +59,48 @@ pub struct ThemePalette {
     pub accent3: (u8, u8, u8),
 }
 
-#[derive(Debug, Clone, Copy)]
+impl ThemePalette {
+    pub fn apply_overrides(&mut self, overrides: &crate::data::config::CustomPaletteConfig) {
+        if let Some(ref hex) = overrides.text {
+            self.text = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.subtext {
+            self.subtext = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.base {
+            self.base = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.surface {
+            self.surface = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.buff {
+            self.buff = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.accent {
+            self.accent = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.accent2 {
+            self.accent2 = parse_hex_color(hex);
+        }
+        if let Some(ref hex) = overrides.accent3 {
+            self.accent3 = parse_hex_color(hex);
+        }
+    }
+}
+
+pub fn parse_hex_color(raw: &str) -> (u8, u8, u8) {
+    let hex = raw.trim().trim_start_matches('#');
+    if !hex.is_ascii() || hex.len() != 6 {
+        return (255, 255, 255);
+    }
+
+    let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255);
+    let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255);
+    let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255);
+    (r, g, b)
+}
+
+#[derive(Debug, Clone)]
 pub struct Theme {
     #[allow(dead_code)]
     pub name: ThemeName,

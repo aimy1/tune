@@ -129,6 +129,7 @@ pub struct HostConfigSync {
     pub bar_number: HostBarNumber,
     pub bar_channels: HostBarChannels,
     pub bar_channel_reverse: bool,
+    pub palette: Option<crate::data::config::CustomPaletteConfig>,
 }
 
 pub trait HostPlaybackBridge {
@@ -160,7 +161,10 @@ pub async fn run_fullscreen(
     utils::stderr_filter::install_alsa_stderr_filter();
 
     let config = tm_config_from_host(host_config);
-    let theme = data::theme_loader::ThemeLoader::load(&host_config.theme)?;
+    let theme = data::theme_loader::ThemeLoader::load_with_overrides(
+        &host_config.theme,
+        host_config.palette.as_ref(),
+    )?;
 
     let mut app = app::state::AppState::new(config, theme, host_config.language);
     let ncm_cover_cache_dir = resolve_cache_root(host_config).join("tmplayer_ncm_cover");
@@ -264,6 +268,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         keybind_home: host.keybind_home.clone(),
         keybind_desktop_lyrics: host.keybind_desktop_lyrics.clone(),
         keybind_desktop_lyrics_lock: host.keybind_desktop_lyrics_lock.clone(),
+        palette: host.palette.clone(),
     }
 }
 

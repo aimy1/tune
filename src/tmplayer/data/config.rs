@@ -177,7 +177,12 @@ pub struct Config {
 
     #[serde(default = "default_keybind_desktop_lyrics_lock")]
     pub keybind_desktop_lyrics_lock: String,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<CustomPaletteConfig>,
 }
+
+pub use crate::data::config::CustomPaletteConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -510,6 +515,7 @@ impl Default for Config {
             keybind_home: default_keybind_home(),
             keybind_desktop_lyrics: default_keybind_desktop_lyrics(),
             keybind_desktop_lyrics_lock: default_keybind_desktop_lyrics_lock(),
+            palette: None,
         }
     }
 }

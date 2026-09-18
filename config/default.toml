@@ -1,3 +1,5 @@
+# 主题设置：支持内置预设 ("hyprland", "system", "latte", "frappe", "macchiato", "mocha")、
+# 自定义主题名 (检索 ~/.config/tune/themes/{name}.toml) 或外部 TOML 文件的绝对/相对路径。
 theme = "hyprland"
 ui_fps = 30
 spectrum_hz = 60
@@ -59,3 +61,18 @@ keybind_fullscreen_toggle_play_pause = "Space"
 keybind_fullscreen_toggle_mode = "M"
 keybind_toggle_like_fullscreen = "L"
 keybind_toggle_like_collapsed = "L"
+
+# ==============================================================================
+# UI 配色注入与覆盖 (可选)
+# 在此处直接指定十六进制颜色 (#RRGGBB)，可覆盖当前 theme 预设中的对应色值。
+# 若某项被注释或未配置，则继承当前 theme 的对应配色。
+# ==============================================================================
+# [palette]
+# text = "#F2F4F8"     # 主前景色 / 文本
+# subtext = "#949CBB"  # 次级文本 / 辅助提示 / 未激活状态
+# base = "#11111B"     # 应用底层背景色
+# surface = "#181825"  # 卡片 / 弹窗 / 浮层表面背景色
+# buff = "#2A2B3D"     # 分隔线 / 弱化边框
+# accent = "#33CCFF"   # 主要强调高亮色 (按钮、焦点高亮、歌词重点)
+# accent2 = "#00FF99"  # 次要强调色 (播放进度、徽章、音波可视化)
+# accent3 = "#CBA6F7"  # 补充强调色 (红心收藏、警告状态)

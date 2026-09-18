@@ -176,7 +176,14 @@ async fn main() -> Result<()> {
     install_panic_hook();
     ring::default_provider().install_default().unwrap();
     let config = Config::load_or_default()?;
-    let theme = ThemeLoader::load(&config.theme).unwrap_or_default();
+    let theme = ThemeLoader::load_with_overrides(&config.theme, config.palette.as_ref())
+        .unwrap_or_else(|_| {
+            let mut def = ui::theme::Theme::default();
+            if let Some(ref pal) = config.palette {
+                def.palette.apply_overrides(pal);
+            }
+            def
+        });
     let mut app = App::new(config, theme).await?;
 
     let mut terminal = init_terminal()?;
