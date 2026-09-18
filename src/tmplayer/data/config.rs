@@ -458,7 +458,7 @@ fn default_desktop_lyrics_opacity() -> u8 {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            theme: "mocha".to_string(),
+            theme: "noctalia".to_string(),
             ui_fps: 30,
             spectrum_hz: 60,
             mpris_poll_ms: 100,

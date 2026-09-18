@@ -1,6 +1,6 @@
-# 主题设置：支持内置预设 ("hyprland", "system", "latte", "frappe", "macchiato", "mocha")、
+# 主题设置：支持内置预设 ("noctalia", "hyprland", "system", "latte", "frappe", "macchiato", "mocha")、
 # 自定义主题名 (检索 ~/.config/tune/themes/{name}.toml) 或外部 TOML 文件的绝对/相对路径。
-theme = "hyprland"
+theme = "noctalia"
 ui_fps = 30
 spectrum_hz = 60
 mpris_poll_ms = 100

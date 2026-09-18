@@ -1688,6 +1688,8 @@ pub struct App {
     system_volume: Option<crate::tmplayer::utils::system_volume::SystemVolume>,
     pub graphics_picker: Picker,
     pub desktop_lyrics_manager: DesktopLyricsManager,
+    theme_file_mtime: Option<std::time::SystemTime>,
+    theme_check_ticks: u32,
 }
 
 impl App {
@@ -1739,6 +1741,10 @@ impl App {
         let (lyric_fetch_res_tx, lyric_fetch_rx) = mpsc::channel::<LyricFetchResult>();
         let worker = loop_lyric_fetch(lyric_fetch_req_rx, lyric_fetch_res_tx, api.clone());
         tokio::spawn(worker);
+
+        let theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&config.theme))
+            .and_then(|m| m.modified())
+            .ok();
 
         let mut app = Self {
             config,
@@ -1814,6 +1820,8 @@ impl App {
             system_volume,
             graphics_picker: Picker::halfblocks(),
             desktop_lyrics_manager,
+            theme_file_mtime,
+            theme_check_ticks: 0,
         };
 
         if Picker::from_query_stdio().is_ok() {
@@ -1865,6 +1873,7 @@ impl App {
         self.tick_search_box_animation();
         self.tick_home_sidebar_animation();
         self.tick_startup_loading();
+        self.tick_theme_hot_reload();
 
         if self.page == Page::Login && self.login.method == LoginMethod::Qr {
             if self.login.qr_key.trim().is_empty() {
@@ -4621,6 +4630,10 @@ impl App {
                 if let Ok(theme) = ThemeLoader::load_with_overrides(next_name, self.config.palette.as_ref()) {
                     self.theme = theme;
                     self.config.theme = next_name.clone();
+                    self.theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&self.config.theme))
+                        .and_then(|m| m.modified())
+                        .ok();
+                    self.sync_desktop_lyrics();
                     let _ = self.config.save();
                 }
             }
@@ -5111,6 +5124,34 @@ impl App {
         )
     }
 
+    fn tick_theme_hot_reload(&mut self) {
+        self.theme_check_ticks = self.theme_check_ticks.saturating_add(1);
+        if self.theme_check_ticks < self.config.ui_fps.max(15) {
+            return;
+        }
+        self.theme_check_ticks = 0;
+
+        let path = ThemeLoader::resolve_theme_path(&self.config.theme);
+        if let Ok(metadata) = std::fs::metadata(&path) {
+            if let Ok(mtime) = metadata.modified() {
+                if let Some(last_mtime) = self.theme_file_mtime {
+                    if mtime > last_mtime {
+                        self.theme_file_mtime = Some(mtime);
+                        if let Ok(new_theme) = ThemeLoader::load_with_overrides(
+                            &self.config.theme,
+                            self.config.palette.as_ref(),
+                        ) {
+                            self.theme = new_theme;
+                            self.sync_desktop_lyrics();
+                        }
+                    }
+                } else {
+                    self.theme_file_mtime = Some(mtime);
+                }
+            }
+        }
+    }
+
     fn is_double_content_click(&mut self, page: Page, index: usize) -> bool {
         let now = Instant::now();
         let is_double = self
@@ -5350,6 +5391,10 @@ impl App {
         if theme_dirty {
             if let Ok(theme) = ThemeLoader::load_with_overrides(&self.config.theme, self.config.palette.as_ref()) {
                 self.theme = theme;
+                self.theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&self.config.theme))
+                    .and_then(|m| m.modified())
+                    .ok();
+                self.sync_desktop_lyrics();
             }
         }
 

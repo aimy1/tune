@@ -117,15 +117,21 @@ impl ThemeLoader {
         })
     }
 
+    pub fn resolve_theme_path(spec: &str) -> PathBuf {
+        let _ = assets::ensure_assets_ready();
+        resolve_theme_file(spec)
+    }
+
     pub fn available_themes() -> Vec<String> {
         let _ = assets::ensure_assets_ready();
         let mut themes = vec![
-            "system".to_string(),
+            "noctalia".to_string(),
             "hyprland".to_string(),
-            "latte".to_string(),
-            "frappe".to_string(),
-            "macchiato".to_string(),
             "mocha".to_string(),
+            "macchiato".to_string(),
+            "frappe".to_string(),
+            "latte".to_string(),
+            "system".to_string(),
         ];
 
         let themes_dir = assets::resolve_asset_path(Path::new("themes"));
@@ -138,7 +144,7 @@ impl ThemeLoader {
                 {
                     if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         let canonical = match stem {
-                            "system" | "hyprland" => continue,
+                            "system" | "hyprland" | "noctalia" => continue,
                             "catppuccin_latte" => continue,
                             "catppuccin_frappe" => continue,
                             "catppuccin_macchiato" => continue,
@@ -170,6 +176,7 @@ fn resolve_theme_file(spec: &str) -> PathBuf {
     }
 
     let built_in_rel = match spec.to_lowercase().as_str() {
+        "noctalia" => Some("themes/noctalia.toml"),
         "system" => Some("themes/system.toml"),
         "hyprland" => Some("themes/hyprland.toml"),
         "latte" | "catppuccin_latte" => Some("themes/catppuccin_latte.toml"),
@@ -184,6 +191,12 @@ fn resolve_theme_file(spec: &str) -> PathBuf {
         if p.is_file() {
             return p;
         }
+        if spec.eq_ignore_ascii_case("noctalia") {
+            try_generate_or_fallback_noctalia(&p);
+            if p.is_file() {
+                return p;
+            }
+        }
     }
 
     let custom_file = format!("themes/{}.toml", spec);
@@ -193,6 +206,96 @@ fn resolve_theme_file(spec: &str) -> PathBuf {
     }
 
     assets::resolve_asset_path(Path::new("themes/system.toml"))
+}
+
+fn try_generate_or_fallback_noctalia(target_path: &Path) {
+    if let Some(dirs) = directories::BaseDirs::new() {
+        let config_dir = dirs.config_dir();
+
+        let mut text = None;
+        let subtext = None;
+        let mut base = None;
+        let surface = None;
+        let buff = None;
+        let mut accent = None;
+        let mut accent2 = None;
+        let mut accent3 = None;
+
+        // 1. Try alacritty noctalia.toml
+        let alacritty = config_dir.join("alacritty/themes/noctalia.toml");
+        if let Ok(raw) = fs::read_to_string(&alacritty) {
+            for line in raw.lines() {
+                let trimmed = line.trim();
+                if let Some((k, v)) = trimmed.split_once('=') {
+                    let k = k.trim();
+                    let val = v.trim().trim_matches('\'').trim_matches('"');
+                    if val.starts_with('#') {
+                        match k {
+                            "background" if base.is_none() => base = Some(val.to_string()),
+                            "foreground" if text.is_none() => text = Some(val.to_string()),
+                            "magenta" if accent.is_none() => accent = Some(val.to_string()),
+                            "yellow" if accent2.is_none() => accent2 = Some(val.to_string()),
+                            "blue" if accent3.is_none() => accent3 = Some(val.to_string()),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Try kitty noctalia.conf if missing
+        let kitty = config_dir.join("kitty/themes/noctalia.conf");
+        if let Ok(raw) = fs::read_to_string(&kitty) {
+            for line in raw.lines() {
+                let mut parts = line.split_whitespace();
+                if let (Some(k), Some(v)) = (parts.next(), parts.next()) {
+                    let val = v.trim_matches('\'').trim_matches('"');
+                    if val.starts_with('#') {
+                        match k {
+                            "background" if base.is_none() => base = Some(val.to_string()),
+                            "foreground" if text.is_none() => text = Some(val.to_string()),
+                            "active_border_color" if accent.is_none() => accent = Some(val.to_string()),
+                            "color3" if accent2.is_none() => accent2 = Some(val.to_string()),
+                            "color4" if accent3.is_none() => accent3 = Some(val.to_string()),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        if let (Some(b), Some(t), Some(a)) = (base.as_deref(), text.as_deref(), accent.as_deref()) {
+            let def_base = parse_hex(b);
+            let s_val = surface.unwrap_or_else(|| {
+                format!(
+                    "#{:02X}{:02X}{:02X}",
+                    def_base.0.saturating_add(13),
+                    def_base.1.saturating_add(13),
+                    def_base.2.saturating_add(13)
+                )
+            });
+            let b_val = buff.unwrap_or_else(|| {
+                format!(
+                    "#{:02X}{:02X}{:02X}",
+                    def_base.0.saturating_add(24),
+                    def_base.1.saturating_add(24),
+                    def_base.2.saturating_add(24)
+                )
+            });
+            let sub_val = subtext.unwrap_or_else(|| "#d3c2c9".to_string());
+            let a2_val = accent2.unwrap_or_else(|| "#debece".to_string());
+            let a3_val = accent3.unwrap_or_else(|| "#f4ba9f".to_string());
+
+            let toml_content = format!(
+                "# Noctalia theme for Tune\n# Generated from system Noctalia configuration\nname = \"noctalia\"\n\ntext = \"{}\"\nsubtext = \"{}\"\nbase = \"{}\"\nsurface = \"{}\"\nbuff = \"{}\"\naccent = \"{}\"\naccent2 = \"{}\"\naccent3 = \"{}\"\n",
+                t, sub_val, b, s_val, b_val, a, a2_val, a3_val
+            );
+            if let Some(parent) = target_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let _ = fs::write(target_path, toml_content);
+        }
+    }
 }
 
 fn parse_hex(s: &str) -> (u8, u8, u8) {

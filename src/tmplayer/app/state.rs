@@ -329,6 +329,8 @@ pub struct AppState {
     pub playlist_slide_target_x: i16,
 
     pub last_frame: Instant,
+    pub theme_file_mtime: Option<std::time::SystemTime>,
+    pub theme_check_ticks: u32,
 }
 
 #[derive(Debug)]
@@ -382,6 +384,10 @@ impl AppState {
         });
 
         let (remote_fetch_tx, remote_fetch_rx) = start_remote_fetch_worker();
+
+        let theme_file_mtime = std::fs::metadata(&crate::tmplayer::data::theme_loader::ThemeLoader::resolve_theme_path(&config.theme))
+            .and_then(|m| m.modified())
+            .ok();
 
         Self {
             config,
@@ -439,6 +445,8 @@ impl AppState {
             playlist_slide_x: 0,
             playlist_slide_target_x: 0,
             last_frame: Instant::now(),
+            theme_file_mtime,
+            theme_check_ticks: 0,
         }
     }
 

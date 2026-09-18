@@ -214,6 +214,9 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
     if theme_dirty {
         if let Ok(theme) = ThemeLoader::load_with_overrides(&app.config.theme, app.config.palette.as_ref()) {
             app.theme = theme;
+            app.theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&app.config.theme))
+                .and_then(|m| m.modified())
+                .ok();
         }
     }
 
@@ -639,6 +642,31 @@ pub async fn run(
             frame_start.duration_since(last_host_config_sync) >= Duration::from_millis(250);
         if sync_config {
             last_host_config_sync = frame_start;
+        }
+
+        if app.theme_check_ticks >= app.config.ui_fps.max(15) {
+            app.theme_check_ticks = 0;
+            let path = ThemeLoader::resolve_theme_path(&app.config.theme);
+            if let Ok(metadata) = std::fs::metadata(&path) {
+                if let Ok(mtime) = metadata.modified() {
+                    if let Some(last_mtime) = app.theme_file_mtime {
+                        if mtime > last_mtime {
+                            app.theme_file_mtime = Some(mtime);
+                            if let Ok(new_theme) = ThemeLoader::load_with_overrides(
+                                &app.config.theme,
+                                app.config.palette.as_ref(),
+                            ) {
+                                app.theme = new_theme;
+                                state_changed = true;
+                            }
+                        }
+                    } else {
+                        app.theme_file_mtime = Some(mtime);
+                    }
+                }
+            }
+        } else {
+            app.theme_check_ticks = app.theme_check_ticks.saturating_add(1);
         }
 
         state_changed |= sync_from_host_bridge(
@@ -2077,6 +2105,9 @@ async fn apply_settings_delta(
             if let Ok(theme) = ThemeLoader::load_with_overrides(key, app.config.palette.as_ref()) {
                 app.theme = theme;
                 app.config.theme = key.clone();
+                app.theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&app.config.theme))
+                    .and_then(|m| m.modified())
+                    .ok();
                 save_and_sync_host_config(app, host_bridge).await;
             } else {
                 app.set_toast("Theme load error");

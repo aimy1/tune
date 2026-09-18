@@ -12,6 +12,7 @@ pub enum ColorCapability {
 pub enum ThemeName {
     System,
     Hyprland,
+    Noctalia,
     Latte,
     Frappe,
     Macchiato,
@@ -23,10 +24,11 @@ impl ThemeName {
     pub fn from_str_or_system(raw: &str) -> Self {
         match raw.to_lowercase().as_str() {
             "hyprland" => Self::Hyprland,
-            "latte" => Self::Latte,
-            "frappe" => Self::Frappe,
-            "macchiato" => Self::Macchiato,
-            "mocha" => Self::Mocha,
+            "noctalia" => Self::Noctalia,
+            "latte" | "catppuccin_latte" => Self::Latte,
+            "frappe" | "catppuccin_frappe" => Self::Frappe,
+            "macchiato" | "catppuccin_macchiato" => Self::Macchiato,
+            "mocha" | "catppuccin_mocha" => Self::Mocha,
             "system" => Self::System,
             other if !other.is_empty() => Self::Custom(raw.to_string()),
             _ => Self::System,
@@ -38,6 +40,7 @@ impl ThemeName {
         match self {
             Self::System => "system",
             Self::Hyprland => "hyprland",
+            Self::Noctalia => "noctalia",
             Self::Latte => "latte",
             Self::Frappe => "frappe",
             Self::Macchiato => "macchiato",
