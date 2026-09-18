@@ -480,22 +480,18 @@ class DesktopLyricsWindow(Gtk.Window):
             bg_val = f"background: rgba(10, 10, 15, {0.94 * alpha:.2f});"
             border_val = f"border: 1px solid rgba(80, 80, 110, {0.45 * alpha:.2f});"
             radius_val = "border-radius: 18px;"
-            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
         elif self.bg_style == "light":
             bg_val = f"background: rgba(22, 22, 34, {0.42 * alpha:.2f});"
             border_val = f"border: 1px solid rgba(255, 255, 255, {0.18 * alpha:.2f});"
             radius_val = "border-radius: 18px;"
-            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
         elif self.bg_style == "transparent":
             bg_val = "background: transparent;"
             border_val = "border: none;"
             radius_val = "border-radius: 0px;"
-            shadow_val = "box-shadow: none;"
         else: # translucent
             bg_val = f"background: rgba(18, 18, 26, {0.78 * alpha:.2f});"
             border_val = f"border: 1px solid rgba(51, 204, 255, {0.35 * alpha:.2f});"
             radius_val = "border-radius: 18px;"
-            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
 
         hint_color = self.current_subtext
         hint_weight = 600
@@ -503,13 +499,11 @@ class DesktopLyricsWindow(Gtk.Window):
         if self.dragging:
             border_val = f"border: 2px solid {self.current_accent};"
             bg_val = "background: rgba(16, 16, 26, 0.95);"
-            shadow_val = f"box-shadow: 0 0 20px {self.current_accent}, inset 0 0 10px rgba(255, 255, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.85);"
             radius_val = "border-radius: 18px;"
             hint_color = self.current_accent
             hint_weight = 700
         elif not self.locked:
             border_val = f"border: 2px dashed {self.current_accent};"
-            shadow_val = "box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);"
             radius_val = "border-radius: 18px;"
 
         main_fs = self.font_size
@@ -520,7 +514,7 @@ class DesktopLyricsWindow(Gtk.Window):
             {bg_val}
             {border_val}
             {radius_val}
-            {shadow_val}
+            box-shadow: none;
             padding: 8px 28px;
             margin: 0px 16px;
         }}
@@ -552,7 +546,6 @@ class DesktopLyricsWindow(Gtk.Window):
             font-family: 'JetBrainsMono Nerd Font', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             font-size: {main_fs}px;
             font-weight: 800;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
             letter-spacing: 0.5px;
         }}
         #lyric-sub {{
@@ -560,7 +553,6 @@ class DesktopLyricsWindow(Gtk.Window):
             font-family: 'JetBrainsMono Nerd Font', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             font-size: {sub_fs}px;
             font-weight: 500;
-            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
         }}
         """
         try:

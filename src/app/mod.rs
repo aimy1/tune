@@ -62,7 +62,7 @@ const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 const SETTINGS_ROOT_ITEMS: usize = 11;
-const SETTINGS_PLAYBACK_ITEMS: usize = 12;
+const SETTINGS_PLAYBACK_ITEMS: usize = 10;
 const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 20;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
@@ -4683,21 +4683,13 @@ impl App {
                 let _ = self.config.save();
             }
             7 => {
-                self.toggle_desktop_lyrics();
-            }
-            8 => {
-                self.settings_desktop_lyrics_selected = 0;
-                self.settings_return_overlay = Overlay::SettingsPlayback;
-                self.overlay = Some(Overlay::SettingsDesktopLyrics);
-            }
-            9 => {
                 let next = self
                     .config
                     .audio_quality
                     .cycle(delta, self.vip_audio_unlocked);
                 self.set_audio_quality(next);
             }
-            10 => {
+            8 => {
                 self.config.playback_memory = !self.config.playback_memory;
                 let _ = self.config.save();
                 if self.config.playback_memory {
@@ -4706,7 +4698,7 @@ impl App {
                     self.clear_playback_memory();
                 }
             }
-            11 => {
+            9 => {
                 self.config.transparent_sidebar = !self.config.transparent_sidebar;
                 let _ = self.config.save();
             }

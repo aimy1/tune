@@ -639,14 +639,6 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
             lang_on_off(app, app.config.page_lyrics).to_string(),
         ),
         (
-            lang_text(app, "桌面歌词", "Desktop Lyrics"),
-            lang_on_off(app, app.config.desktop_lyrics).to_string(),
-        ),
-        (
-            lang_text(app, "桌面歌词设置", "Desktop Lyrics Settings"),
-            "...".to_string(),
-        ),
-        (
             lang_text(app, "音质", "Audio Quality"),
             match app.config.audio_quality {
                 crate::tmplayer::data::config::AudioQuality::Standard => {
