@@ -226,6 +226,7 @@ pub enum Overlay {
     Playlist,
     FolderInput,
     SettingsModal,
+    TransparencySettingsModal,
     BarSettingsModal,
     DesktopLyricsSettingsModal,
     LocalAudioSettingsModal,
@@ -280,6 +281,7 @@ pub struct AppState {
     pub folder_input: FolderInput,
 
     pub settings_selected: usize,
+    pub transparency_settings_selected: usize,
     pub bar_settings_selected: usize,
     pub desktop_lyrics_settings_selected: usize,
     pub desktop_lyrics_settings_return_overlay: Overlay,
@@ -411,6 +413,7 @@ impl AppState {
             overlay: Overlay::None,
             folder_input: FolderInput::default(),
             settings_selected: 0,
+            transparency_settings_selected: 0,
             bar_settings_selected: 0,
             desktop_lyrics_settings_selected: 0,
             desktop_lyrics_settings_return_overlay: Overlay::SettingsModal,

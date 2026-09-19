@@ -62,7 +62,8 @@ const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
 pub(crate) const SETTINGS_ROOT_ITEMS: usize = 12;
-pub(crate) const SETTINGS_PLAYBACK_ITEMS: usize = 10;
+pub(crate) const SETTINGS_TRANSPARENCY_ITEMS: usize = 4;
+pub(crate) const SETTINGS_PLAYBACK_ITEMS: usize = 9;
 pub(crate) const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 21;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
@@ -88,6 +89,7 @@ pub enum Page {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Overlay {
     Settings,
+    SettingsTransparency,
     SettingsPlayback,
     SettingsDesktopLyrics,
     SettingsKeybinds,
@@ -1664,6 +1666,7 @@ pub struct App {
     pub search_box_cursor: usize,
     pub search_box_anim_height: u16,
     pub settings_selected: usize,
+    pub settings_transparency_selected: usize,
     pub settings_playback_selected: usize,
     pub settings_desktop_lyrics_selected: usize,
     pub settings_return_overlay: Overlay,
@@ -1807,6 +1810,7 @@ impl App {
             search_box_cursor: 0,
             search_box_anim_height: 0,
             settings_selected: 0,
+            settings_transparency_selected: 0,
             settings_playback_selected: 0,
             settings_desktop_lyrics_selected: 0,
             settings_return_overlay: Overlay::Settings,
@@ -2043,6 +2047,14 @@ impl App {
                     }
                     return;
                 }
+                if matches!(self.overlay, Some(Overlay::SettingsTransparency)) {
+                    if self.settings_transparency_selected == 0 {
+                        self.settings_transparency_selected = SETTINGS_TRANSPARENCY_ITEMS - 1;
+                    } else {
+                        self.settings_transparency_selected -= 1;
+                    }
+                    return;
+                }
                 if matches!(self.overlay, Some(Overlay::SettingsPlayback)) {
                     if self.settings_playback_selected == 0 {
                         self.settings_playback_selected = SETTINGS_PLAYBACK_ITEMS - 1;
@@ -2085,6 +2097,11 @@ impl App {
                 }
                 if matches!(self.overlay, Some(Overlay::Settings)) {
                     self.settings_selected = (self.settings_selected + 1) % SETTINGS_ROOT_ITEMS;
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsTransparency)) {
+                    self.settings_transparency_selected =
+                        (self.settings_transparency_selected + 1) % SETTINGS_TRANSPARENCY_ITEMS;
                     return;
                 }
                 if matches!(self.overlay, Some(Overlay::SettingsPlayback)) {
@@ -2132,6 +2149,7 @@ impl App {
                 if matches!(
                     self.overlay,
                     Some(Overlay::Settings)
+                        | Some(Overlay::SettingsTransparency)
                         | Some(Overlay::SettingsPlayback)
                         | Some(Overlay::SettingsDesktopLyrics)
                         | Some(Overlay::SettingsKeybinds)
@@ -2906,6 +2924,7 @@ impl App {
     async fn handle_overlay_key(&mut self, overlay: Overlay, key: KeyEvent) {
         match overlay {
             Overlay::Settings => self.handle_settings_root_key(key).await,
+            Overlay::SettingsTransparency => self.handle_settings_transparency_key(key),
             Overlay::SettingsPlayback => self.handle_settings_playback_key(key),
             Overlay::SettingsDesktopLyrics => self.handle_settings_desktop_lyrics_key(key),
             Overlay::SettingsKeybinds => self.handle_settings_keybinds_key(key),
@@ -4482,6 +4501,10 @@ impl App {
                 self.apply_settings_root_delta(-1).await;
             }
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') => match self.settings_selected {
+                1 => {
+                    self.settings_transparency_selected = 0;
+                    self.overlay = Some(Overlay::SettingsTransparency);
+                }
                 4 => {
                     self.settings_playback_selected = 0;
                     self.overlay = Some(Overlay::SettingsPlayback);
@@ -4501,7 +4524,11 @@ impl App {
                 _ => self.apply_settings_root_delta(1).await,
             },
             KeyCode::Enter => match self.settings_selected {
-                0..=3 => self.apply_settings_root_delta(1).await,
+                0 | 2 | 3 => self.apply_settings_root_delta(1).await,
+                1 => {
+                    self.settings_transparency_selected = 0;
+                    self.overlay = Some(Overlay::SettingsTransparency);
+                }
                 4 => {
                     self.settings_playback_selected = 0;
                     self.overlay = Some(Overlay::SettingsPlayback);
@@ -4523,6 +4550,64 @@ impl App {
                 }
                 _ => {}
             },
+            _ => {}
+        }
+    }
+
+    fn handle_settings_transparency_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Backspace => self.overlay = Some(Overlay::Settings),
+            KeyCode::Char('t') | KeyCode::Char('T') => {
+                if key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT {
+                    self.close_overlay();
+                }
+            }
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
+                self.apply_settings_transparency_delta(-1);
+            }
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
+                self.apply_settings_transparency_delta(1);
+            }
+            KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
+                if self.settings_transparency_selected == 0 {
+                    self.settings_transparency_selected = SETTINGS_TRANSPARENCY_ITEMS - 1;
+                } else {
+                    self.settings_transparency_selected -= 1;
+                }
+            }
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => {
+                self.settings_transparency_selected =
+                    (self.settings_transparency_selected + 1) % SETTINGS_TRANSPARENCY_ITEMS;
+            }
+            _ => {}
+        }
+    }
+
+    fn apply_settings_transparency_delta(&mut self, delta: i32) {
+        if delta == 0 {
+            return;
+        }
+        match self.settings_transparency_selected {
+            0 => {
+                self.config.transparent_background = !self.config.transparent_background;
+                let _ = self.config.save();
+            }
+            1 => {
+                self.config.transparent_sidebar = !self.config.transparent_sidebar;
+                let _ = self.config.save();
+            }
+            2 => {
+                self.config.desktop_lyrics_bg = self.config.desktop_lyrics_bg.cycle(delta);
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
+            3 => {
+                let current = self.config.desktop_lyrics_opacity as i32;
+                let next = (current + delta * 5).clamp(0, 100) as u8;
+                self.config.desktop_lyrics_opacity = next;
+                let _ = self.config.save();
+                self.sync_desktop_lyrics();
+            }
             _ => {}
         }
     }
@@ -4729,12 +4814,6 @@ impl App {
                     let _ = self.config.save();
                 }
             }
-            1 => {
-                if delta != 0 {
-                    self.config.transparent_background = !self.config.transparent_background;
-                    let _ = self.config.save();
-                }
-            }
             2 => {
                 if delta != 0 {
                     self.config.language = match self.config.language {
@@ -4858,10 +4937,6 @@ impl App {
                 } else {
                     self.clear_playback_memory();
                 }
-            }
-            9 => {
-                self.config.transparent_sidebar = !self.config.transparent_sidebar;
-                let _ = self.config.save();
             }
             _ => {}
         }
@@ -5497,6 +5572,7 @@ impl App {
         if !modal_area.contains(col, row) {
             match self.overlay {
                 Some(Overlay::Settings) => self.close_overlay(),
+                Some(Overlay::SettingsTransparency) => self.overlay = Some(Overlay::Settings),
                 Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
                 Some(Overlay::SettingsDesktopLyrics) => {
                     self.overlay = Some(self.settings_return_overlay)
@@ -5521,6 +5597,7 @@ impl App {
         if row == modal_area.y {
             match self.overlay {
                 Some(Overlay::Settings) => self.close_overlay(),
+                Some(Overlay::SettingsTransparency) => self.overlay = Some(Overlay::Settings),
                 Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
                 Some(Overlay::SettingsDesktopLyrics) => {
                     self.overlay = Some(self.settings_return_overlay)
@@ -5539,6 +5616,7 @@ impl App {
             if footer.contains(col, row) {
                 match self.overlay {
                     Some(Overlay::Settings) => self.close_overlay(),
+                    Some(Overlay::SettingsTransparency) => self.overlay = Some(Overlay::Settings),
                     Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
                     Some(Overlay::SettingsDesktopLyrics) => {
                         self.overlay = Some(self.settings_return_overlay)
@@ -5577,6 +5655,10 @@ impl App {
                     let prev_selected = self.settings_selected;
                     self.settings_selected = item_idx;
                     match item_idx {
+                        1 => {
+                            self.settings_transparency_selected = 0;
+                            self.overlay = Some(Overlay::SettingsTransparency);
+                        }
                         4 => {
                             self.settings_playback_selected = 0;
                             self.overlay = Some(Overlay::SettingsPlayback);
@@ -5595,7 +5677,7 @@ impl App {
                         11 => {
                             self.overlay = Some(Overlay::SettingsAbout);
                         }
-                        1 | 7 | 8 | 9 => {
+                        7 | 8 | 9 => {
                             self.apply_settings_root_delta(1).await;
                         }
                         0 | 2 | 3 => {
@@ -5609,12 +5691,38 @@ impl App {
                     }
                 }
             }
+            Some(Overlay::SettingsTransparency) => {
+                if item_idx < SETTINGS_TRANSPARENCY_ITEMS {
+                    let prev_selected = self.settings_transparency_selected;
+                    self.settings_transparency_selected = item_idx;
+                    match item_idx {
+                        0 | 1 => {
+                            self.apply_settings_transparency_delta(1);
+                        }
+                        2 => {
+                            if is_right_half {
+                                self.apply_settings_transparency_delta(1);
+                            } else if prev_selected == item_idx {
+                                self.apply_settings_transparency_delta(-1);
+                            }
+                        }
+                        3 => {
+                            if is_right_half {
+                                self.apply_settings_transparency_delta(1);
+                            } else {
+                                self.apply_settings_transparency_delta(-1);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
             Some(Overlay::SettingsPlayback) => {
                 if item_idx < SETTINGS_PLAYBACK_ITEMS {
                     let prev_selected = self.settings_playback_selected;
                     self.settings_playback_selected = item_idx;
                     match item_idx {
-                        1 | 2 | 5 | 6 | 8 | 9 => {
+                        1 | 2 | 5 | 6 | 8 => {
                             self.apply_settings_playback_delta(1);
                         }
                         0 | 3 | 4 | 7 => {
@@ -7825,8 +7933,7 @@ mod tests {
         .await;
         assert_eq!(app.overlay, Some(Overlay::Settings));
 
-        // Click on item 1 (row 7 + 1 = 8): Transparent background toggle
-        let initial_transparent = app.config.transparent_background;
+        // Click on item 1 (row 7 + 1 = 8): Transparency settings submenu
         app.handle_mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
             column: 20,
@@ -7834,7 +7941,28 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::empty(),
         })
         .await;
+        assert_eq!(app.overlay, Some(Overlay::SettingsTransparency));
+
+        // Inside SettingsTransparency, click item 0 (row 7 + 0 = 7): Transparent background toggle
+        let initial_transparent = app.config.transparent_background;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 7,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
         assert_eq!(app.config.transparent_background, !initial_transparent);
+
+        // Click footer (row 23): should return to Settings
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 23,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::Settings));
     }
 
     #[tokio::test]
@@ -7881,8 +8009,7 @@ mod tests {
         .await;
         assert_eq!(app.config.mouse_support, false);
 
-        // While mouse_support is false, clicking item 1 (row 7 + 1 = 8: Transparent background) must be ignored
-        let initial_transparent = app.config.transparent_background;
+        // While mouse_support is false, clicking item 1 (row 7 + 1 = 8: Transparency settings) must be ignored
         app.handle_mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
             column: 20,
@@ -7890,7 +8017,7 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::empty(),
         })
         .await;
-        assert_eq!(app.config.transparent_background, initial_transparent);
+        assert_eq!(app.overlay, Some(Overlay::Settings));
 
         // While mouse_support is false, scrolling must be ignored
         app.settings_selected = 0;
@@ -7912,7 +8039,7 @@ mod tests {
         .await;
         assert_eq!(app.config.mouse_support, true);
 
-        // Now mouse clicks should work again
+        // Now mouse clicks should work again: clicking row 8 opens Transparency settings
         app.handle_mouse(MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
             column: 20,
@@ -7920,6 +8047,76 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::empty(),
         })
         .await;
-        assert_eq!(app.config.transparent_background, !initial_transparent);
+        assert_eq!(app.overlay, Some(Overlay::SettingsTransparency));
+    }
+
+    #[tokio::test]
+    async fn test_settings_transparency_submenu_navigation_and_toggle() {
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::Settings);
+        app.settings_selected = 1;
+
+        // Enter transparency submenu via Enter key
+        app.handle_settings_root_key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::empty(),
+        ))
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::SettingsTransparency));
+        assert_eq!(app.settings_transparency_selected, 0);
+
+        // Item 0: Toggle transparent_background
+        let init_bg = app.config.transparent_background;
+        app.handle_settings_transparency_key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::empty(),
+        ));
+        assert_eq!(app.config.transparent_background, !init_bg);
+
+        // Click item 1 (row 7 + 1 = 8): Toggle transparent_sidebar
+        let init_sidebar = app.config.transparent_sidebar;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 8,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.config.transparent_sidebar, !init_sidebar);
+        assert_eq!(app.settings_transparency_selected, 1);
+
+        // Click item 2 (row 7 + 2 = 9): Cycle desktop_lyrics_bg
+        let init_bg_style = app.config.desktop_lyrics_bg;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 50,
+            row: 9,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_ne!(app.config.desktop_lyrics_bg, init_bg_style);
+        assert_eq!(app.settings_transparency_selected, 2);
+
+        // Click item 3 (row 7 + 3 = 10): Adjust desktop_lyrics_opacity
+        let init_opacity = app.config.desktop_lyrics_opacity;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 50,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_ne!(app.config.desktop_lyrics_opacity, init_opacity);
+        assert_eq!(app.settings_transparency_selected, 3);
+
+        // Click footer (row 23): Return to Settings
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 23,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::Settings));
     }
 }

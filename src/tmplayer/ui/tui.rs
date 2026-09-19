@@ -283,6 +283,9 @@ impl Tui {
             // modals (top-most)
             match app.overlay {
                 Overlay::SettingsModal => render_settings_modal(f, size, app),
+                Overlay::TransparencySettingsModal => {
+                    render_transparency_settings_modal(f, size, app)
+                }
                 Overlay::BarSettingsModal => render_bar_settings_modal(f, size, app),
                 Overlay::DesktopLyricsSettingsModal => {
                     render_desktop_lyrics_settings_modal(f, size, app)
@@ -429,8 +432,8 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
             app.config.theme.clone(),
         ),
         (
-            lang_text(app, "背景透明", "Transparent Background"),
-            lang_on_off(app, app.config.transparent_background).to_string(),
+            lang_text(app, "透明设置", "Transparency Settings"),
+            "...".to_string(),
         ),
         (
             lang_text(app, "语言", "Language"),
@@ -514,6 +517,115 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
         rows[2],
     );
 }
+
+fn render_transparency_settings_modal(
+    f: &mut ratatui::Frame,
+    size: Rect,
+    app: &mut AppState,
+) {
+    let area = centered_rect(size, 70, 20);
+    f.render_widget(ratatui::widgets::Clear, area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .title(lang_text(app, " 透明设置 ", " Transparency Settings "))
+        .title(
+            Line::from(Span::styled(
+                lang_text(app, " [返回 ‹] ", " [Back ‹] "),
+                Style::default().fg(app.theme.color_subtext()),
+            ))
+            .alignment(ratatui::layout::Alignment::Right),
+        )
+        .border_style(
+            Style::default()
+                .fg(app.theme.color_accent())
+                .add_modifier(Modifier::BOLD),
+        )
+        .style(base_bg_style(app));
+    f.render_widget(block, area);
+
+    let inner = area.inner(ratatui::layout::Margin {
+        horizontal: 2,
+        vertical: 1,
+    });
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+    f.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
+
+    let raw_items = vec![
+        (
+            lang_text(app, "背景透明", "Transparent Background"),
+            lang_on_off(app, app.config.transparent_background).to_string(),
+        ),
+        (
+            lang_text(app, "个人中心透明", "Personal Center Transparent"),
+            lang_on_off(app, app.config.transparent_sidebar).to_string(),
+        ),
+        (
+            lang_text(app, "桌面歌词背景样式", "Desktop Lyrics Background Style"),
+            app.config
+                .desktop_lyrics_bg
+                .display_name(app.language)
+                .to_string(),
+        ),
+        (
+            lang_text(app, "桌面歌词背景透明度", "Desktop Lyrics Background Opacity"),
+            format!("{}%", app.config.desktop_lyrics_opacity),
+        ),
+    ];
+
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.transparency_settings_selected;
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
+
+    f.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    let footer_text = lang_text(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 切换  Esc/t: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Toggle  Esc/t: Back",
+    );
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
+}
+
 
 fn render_acoustid_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
     let area = centered_rect(size, 60, 8);
@@ -699,10 +811,6 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
         (
             lang_text(app, "播放记忆", "Playback Memory"),
             lang_on_off(app, app.config.playback_memory).to_string(),
-        ),
-        (
-            lang_text(app, "个人中心透明", "Personal Center Transparent"),
-            lang_on_off(app, app.config.transparent_sidebar).to_string(),
         ),
     ];
 
@@ -1979,6 +2087,38 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
         return None;
     }
 
+    if app.overlay == Overlay::TransparencySettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if !contains(area, col, row) || row == area.y {
+            return Some(Action::CloseOverlay);
+        }
+        let inner = area.inner(ratatui::layout::Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        if contains(rows[2], col, row) {
+            return Some(Action::CloseOverlay);
+        }
+        if contains(rows[1], col, row) {
+            let idx = (row.saturating_sub(rows[1].y)) as usize;
+            if idx < 4 {
+                return Some(Action::TransparencySettingsClickItem {
+                    index: idx,
+                    is_right: col >= inner.x + inner.width / 2,
+                });
+            }
+        }
+        return None;
+    }
+
     if app.overlay == Overlay::BarSettingsModal {
         let area = centered_rect(layout.full, 70, 20);
         if !contains(area, col, row) || row == area.y {
@@ -2001,7 +2141,7 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
         }
         if contains(rows[1], col, row) {
             let idx = (row.saturating_sub(rows[1].y)) as usize;
-            if idx < 10 {
+            if idx < 9 {
                 return Some(Action::BarSettingsClickItem {
                     index: idx,
                     is_right: col >= inner.x + inner.width / 2,

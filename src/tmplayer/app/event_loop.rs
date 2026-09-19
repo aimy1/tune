@@ -1153,6 +1153,7 @@ async fn handle_action(
                 app.overlay = app.desktop_lyrics_settings_return_overlay;
             } else if app.overlay == Overlay::AcoustIdModal
                 || app.overlay == Overlay::BarSettingsModal
+                || app.overlay == Overlay::TransparencySettingsModal
                 || app.overlay == Overlay::LocalAudioSettingsModal
                 || app.overlay == Overlay::AboutModal
                 || app.overlay == Overlay::HelpModal
@@ -1268,8 +1269,12 @@ async fn handle_action(
                 }
             }
             Overlay::SettingsModal => match app.settings_selected {
-                0 | 1 | 2 | 3 => {
+                0 | 2 | 3 => {
                     apply_settings_delta(app, host_bridge, 1).await;
+                }
+                1 => {
+                    app.transparency_settings_selected = 0;
+                    app.overlay = Overlay::TransparencySettingsModal;
                 }
                 4 => {
                     app.bar_settings_selected = 0;
@@ -1301,6 +1306,9 @@ async fn handle_action(
                 }
                 _ => {}
             },
+            Overlay::TransparencySettingsModal => {
+                apply_transparency_settings_delta(app, host_bridge, 1).await;
+            }
             Overlay::BarSettingsModal => match app.bar_settings_selected {
                 0 => {
                     if crate::tmplayer::audio::cava::is_available() {
@@ -1344,10 +1352,6 @@ async fn handle_action(
                 }
                 8 => {
                     app.config.playback_memory = !app.config.playback_memory;
-                    save_and_sync_host_config(app, host_bridge).await;
-                }
-                9 => {
-                    app.config.transparent_sidebar = !app.config.transparent_sidebar;
                     save_and_sync_host_config(app, host_bridge).await;
                 }
                 _ => {}
@@ -1514,14 +1518,21 @@ async fn handle_action(
         }
         Action::ModalUp => {
             if app.overlay == Overlay::SettingsModal {
-                let count = 11;
+                let count = 12;
                 if app.settings_selected == 0 {
                     app.settings_selected = count - 1;
                 } else {
                     app.settings_selected -= 1;
                 }
+            } else if app.overlay == Overlay::TransparencySettingsModal {
+                let count = 4;
+                if app.transparency_settings_selected == 0 {
+                    app.transparency_settings_selected = count - 1;
+                } else {
+                    app.transparency_settings_selected -= 1;
+                }
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 10;
+                let count = 9;
                 if app.bar_settings_selected == 0 {
                     app.bar_settings_selected = count - 1;
                 } else {
@@ -1558,10 +1569,13 @@ async fn handle_action(
         }
         Action::ModalDown => {
             if app.overlay == Overlay::SettingsModal {
-                let count = 11;
+                let count = 12;
                 app.settings_selected = (app.settings_selected + 1) % count;
+            } else if app.overlay == Overlay::TransparencySettingsModal {
+                let count = 4;
+                app.transparency_settings_selected = (app.transparency_settings_selected + 1) % count;
             } else if app.overlay == Overlay::BarSettingsModal {
-                let count = 10;
+                let count = 9;
                 app.bar_settings_selected = (app.bar_settings_selected + 1) % count;
             } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
                 let count = 9;
@@ -1583,6 +1597,8 @@ async fn handle_action(
         Action::ModalLeft => {
             if app.overlay == Overlay::SettingsModal {
                 apply_settings_delta(app, host_bridge, -1).await;
+            } else if app.overlay == Overlay::TransparencySettingsModal {
+                apply_transparency_settings_delta(app, host_bridge, -1).await;
             } else if app.overlay == Overlay::BarSettingsModal {
                 match app.bar_settings_selected {
                     0 => {
@@ -1624,10 +1640,6 @@ async fn handle_action(
                         app.config.playback_memory = !app.config.playback_memory;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
-                    9 => {
-                        app.config.transparent_sidebar = !app.config.transparent_sidebar;
-                        save_and_sync_host_config(app, host_bridge).await;
-                    }
                     _ => {}
                 }
             } else if app.overlay == Overlay::DesktopLyricsSettingsModal {
@@ -1646,6 +1658,10 @@ async fn handle_action(
         Action::ModalRight => {
             if app.overlay == Overlay::SettingsModal {
                 match app.settings_selected {
+                    1 => {
+                        app.transparency_settings_selected = 0;
+                        app.overlay = Overlay::TransparencySettingsModal;
+                    }
                     4 => {
                         app.bar_settings_selected = 0;
                         app.overlay = Overlay::BarSettingsModal;
@@ -1666,6 +1682,8 @@ async fn handle_action(
                         apply_settings_delta(app, host_bridge, 1).await;
                     }
                 }
+            } else if app.overlay == Overlay::TransparencySettingsModal {
+                apply_transparency_settings_delta(app, host_bridge, 1).await;
             } else if app.overlay == Overlay::BarSettingsModal {
                 match app.bar_settings_selected {
                     0 => {
@@ -1705,10 +1723,6 @@ async fn handle_action(
                     }
                     8 => {
                         app.config.playback_memory = !app.config.playback_memory;
-                        save_and_sync_host_config(app, host_bridge).await;
-                    }
-                    9 => {
-                        app.config.transparent_sidebar = !app.config.transparent_sidebar;
                         save_and_sync_host_config(app, host_bridge).await;
                     }
                     _ => {}
@@ -1882,6 +1896,7 @@ async fn handle_action(
         }
         Action::VolumeUp => {
             if app.overlay == Overlay::SettingsModal
+                || app.overlay == Overlay::TransparencySettingsModal
                 || app.overlay == Overlay::BarSettingsModal
                 || app.overlay == Overlay::DesktopLyricsSettingsModal
                 || app.overlay == Overlay::HelpModal
@@ -1932,6 +1947,7 @@ async fn handle_action(
         }
         Action::VolumeDown => {
             if app.overlay == Overlay::SettingsModal
+                || app.overlay == Overlay::TransparencySettingsModal
                 || app.overlay == Overlay::BarSettingsModal
                 || app.overlay == Overlay::DesktopLyricsSettingsModal
                 || app.overlay == Overlay::HelpModal
@@ -2098,9 +2114,13 @@ async fn handle_action(
                 let prev = app.settings_selected;
                 app.settings_selected = index;
                 match index {
-                    0..=3 => {
+                    0 | 2 | 3 => {
                         let delta = if is_right || prev == index { 1 } else { -1 };
                         apply_settings_delta(app, host_bridge, delta).await;
+                    }
+                    1 => {
+                        app.transparency_settings_selected = 0;
+                        app.overlay = Overlay::TransparencySettingsModal;
                     }
                     4 => {
                         app.bar_settings_selected = 0;
@@ -2129,7 +2149,7 @@ async fn handle_action(
             }
         }
         Action::BarSettingsClickItem { index, is_right } => {
-            if app.overlay == Overlay::BarSettingsModal && index < 10 {
+            if app.overlay == Overlay::BarSettingsModal && index < 9 {
                 let prev = app.bar_settings_selected;
                 app.bar_settings_selected = index;
                 let action = if is_right || prev == index {
@@ -2146,6 +2166,14 @@ async fn handle_action(
                     layout,
                 ))
                 .await?;
+            }
+        }
+        Action::TransparencySettingsClickItem { index, is_right } => {
+            if app.overlay == Overlay::TransparencySettingsModal && index < 4 {
+                let prev = app.transparency_settings_selected;
+                app.transparency_settings_selected = index;
+                let delta = if is_right || prev == index { 1 } else { -1 };
+                apply_transparency_settings_delta(app, host_bridge, delta).await;
             }
         }
         Action::DesktopLyricsSettingsClickItem { index, is_right } => {
@@ -2236,13 +2264,6 @@ async fn apply_settings_delta(
                 app.set_toast("Theme load error");
             }
         }
-        // Transparent background
-        1 => {
-            if delta != 0 {
-                app.config.transparent_background = !app.config.transparent_background;
-                save_and_sync_host_config(app, host_bridge).await;
-            }
-        }
         // Language
         2 => {
             if delta != 0 {
@@ -2285,6 +2306,39 @@ async fn apply_settings_delta(
                 app.config.home_more_recommend = !app.config.home_more_recommend;
                 save_and_sync_host_config(app, host_bridge).await;
             }
+        }
+        _ => {}
+    }
+}
+
+async fn apply_transparency_settings_delta(
+    app: &mut AppState,
+    host_bridge: &mut Option<&mut impl HostPlaybackBridge>,
+    delta: i32,
+) {
+    if delta == 0 {
+        return;
+    }
+    match app.transparency_settings_selected {
+        0 => {
+            app.config.transparent_background = !app.config.transparent_background;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        1 => {
+            app.config.transparent_sidebar = !app.config.transparent_sidebar;
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        2 => {
+            app.config.desktop_lyrics_bg = app.config.desktop_lyrics_bg.cycle(delta);
+            save_and_sync_host_config(app, host_bridge).await;
+        }
+        3 => {
+            app.config.desktop_lyrics_opacity =
+                crate::data::config::cycle_desktop_lyrics_opacity(
+                    app.config.desktop_lyrics_opacity,
+                    delta,
+                );
+            save_and_sync_host_config(app, host_bridge).await;
         }
         _ => {}
     }

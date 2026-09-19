@@ -22,6 +22,7 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &mut App) {
 
     let title = match app.overlay {
         Some(Overlay::Settings) => l(app, " 设置 ", " Settings "),
+        Some(Overlay::SettingsTransparency) => l(app, " 透明设置 ", " Transparency Settings "),
         Some(Overlay::SettingsPlayback) => l(app, " 播放设置 ", " Playback Settings "),
         Some(Overlay::SettingsDesktopLyrics) => l(app, " 桌面歌词设置 ", " Desktop Lyrics Settings "),
         Some(Overlay::SettingsKeybinds) => l(app, " 按键绑定 ", " Keybinds "),
@@ -62,6 +63,7 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &mut App) {
     });
 
     match app.overlay {
+        Some(Overlay::SettingsTransparency) => draw_transparency_settings(frame, app, area, inner),
         Some(Overlay::SettingsPlayback) => draw_playback_settings(frame, app, area, inner),
         Some(Overlay::SettingsDesktopLyrics) => draw_desktop_lyrics_settings(frame, app, area, inner),
         Some(Overlay::SettingsKeybinds) => draw_keybind_settings(frame, app, area, inner),
@@ -109,8 +111,8 @@ fn draw_root_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect)
     let raw_items = vec![
         (l(app, "主题", "Theme"), app.config.theme.clone()),
         (
-            l(app, "背景透明", "Transparent Background"),
-            on_off(app, app.config.transparent_background).to_string(),
+            l(app, "透明设置", "Transparency Settings"),
+            "...".to_string(),
         ),
         (
             l(app, "语言", "Language"),
@@ -187,6 +189,106 @@ fn draw_root_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect)
         app,
         "  ↑/k ↓/j: 导航  ←/h →/l: 调节/进入  Enter: 确认  Esc/t: 关闭",
         "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust/Enter  Enter: Confirm  Esc/t: Close",
+    );
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            footer_text,
+            Style::default().fg(app.theme.color_subtext()),
+        )))
+        .style(Style::default().bg(app.theme.color_surface())),
+        rows[2],
+    );
+}
+
+fn draw_transparency_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect) {
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(inner);
+
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: Some(crate::app::HitRect {
+            x: rows[1].x,
+            y: rows[1].y,
+            width: rows[1].width,
+            height: rows[1].height,
+        }),
+        footer_area: Some(crate::app::HitRect {
+            x: rows[2].x,
+            y: rows[2].y,
+            width: rows[2].width,
+            height: rows[2].height,
+        }),
+        list_scroll: 0,
+        list_count: crate::app::SETTINGS_TRANSPARENCY_ITEMS,
+    };
+    frame.render_widget(
+        Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
+        rows[0],
+    );
+
+    let raw_items = vec![
+        (
+            l(app, "背景透明", "Transparent Background"),
+            on_off(app, app.config.transparent_background).to_string(),
+        ),
+        (
+            l(app, "个人中心透明", "Personal Center Transparent"),
+            on_off(app, app.config.transparent_sidebar).to_string(),
+        ),
+        (
+            l(app, "桌面歌词背景样式", "Desktop Lyrics Background Style"),
+            app.config
+                .desktop_lyrics_bg
+                .display_name(app.config.language)
+                .to_string(),
+        ),
+        (
+            l(app, "桌面歌词背景透明度", "Desktop Lyrics Background Opacity"),
+            format!("{}%", app.config.desktop_lyrics_opacity),
+        ),
+    ];
+
+    let lines: Vec<Line> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, (key, val))| {
+            let selected = idx == app.settings_transparency_selected;
+            let prefix = if selected { "› " } else { "  " };
+            let style = if selected {
+                Style::default()
+                    .fg(app.theme.color_base())
+                    .bg(app.theme.color_accent())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+                    .fg(app.theme.color_text())
+                    .bg(app.theme.color_surface())
+            };
+            let line_str = format_setting_line(prefix, key, val, inner.width);
+            Line::from(Span::styled(line_str, style))
+        })
+        .collect();
+
+    frame.render_widget(
+        Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface())),
+        rows[1],
+    );
+
+    let footer_text = l(
+        app,
+        "  ↑/k ↓/j: 导航  ←/h →/l: 调节  Enter: 切换  Esc/t: 返回上一级",
+        "  ↑/k ↓/j: Navigate  ←/h →/l: Adjust  Enter: Toggle  Esc/t: Back",
     );
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
@@ -287,10 +389,6 @@ fn draw_playback_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: R
         (
             l(app, "播放记忆", "Playback Memory"),
             on_off(app, app.config.playback_memory).to_string()
-        ),
-        (
-            l(app, "个人中心透明", "Personal Center Transparent"),
-            on_off(app, app.config.transparent_sidebar).to_string()
         ),
     ];
 

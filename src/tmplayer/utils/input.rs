@@ -38,6 +38,7 @@ pub enum Action {
     ModalRight,
 
     SettingsClickItem { index: usize, is_right: bool },
+    TransparencySettingsClickItem { index: usize, is_right: bool },
     BarSettingsClickItem { index: usize, is_right: bool },
     DesktopLyricsSettingsClickItem { index: usize, is_right: bool },
     HelpSelect(usize),
@@ -121,7 +122,10 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         };
     }
 
-    if overlay == Overlay::BarSettingsModal || overlay == Overlay::DesktopLyricsSettingsModal {
+    if overlay == Overlay::TransparencySettingsModal
+        || overlay == Overlay::BarSettingsModal
+        || overlay == Overlay::DesktopLyricsSettingsModal
+    {
         if keybind_matches(&config.keybind_settings, ev)
             || matches!(ev.code, KeyCode::Char('t') | KeyCode::Char('T'))
         {
