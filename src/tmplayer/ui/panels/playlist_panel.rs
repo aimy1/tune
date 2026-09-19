@@ -179,8 +179,12 @@ fn render_album_cover(f: &mut Frame, area: Rect, app: &mut AppState) {
 
     if !fully_expanded {
         // Hide album cover while opening/closing; use a pure solid color placeholder.
+        let mut placeholder_style = Style::default();
+        if !app.config.transparent_sidebar {
+            placeholder_style = placeholder_style.bg(app.theme.color_surface());
+        }
         f.render_widget(
-            Block::default().style(Style::default().bg(app.theme.color_surface())),
+            Block::default().style(placeholder_style),
             cover,
         );
         render_multi_album_hint_bars(f, area, cover, app);
@@ -221,13 +225,13 @@ fn render_album_cover(f: &mut Frame, area: Rect, app: &mut AppState) {
             anim.dir,
             offset,
         );
+        let mut cover_style = Style::default().fg(app.theme.color_text());
+        if !app.config.transparent_sidebar {
+            cover_style = cover_style.bg(app.theme.color_surface());
+        }
         f.render_widget(
             Paragraph::new(composed)
-                .style(
-                    Style::default()
-                        .bg(app.theme.color_surface())
-                        .fg(app.theme.color_text()),
-                )
+                .style(cover_style)
                 .wrap(Wrap { trim: false }),
             cover,
         );
@@ -248,13 +252,13 @@ fn render_album_cover(f: &mut Frame, area: Rect, app: &mut AppState) {
             '█',
         );
         app.local_view_album_cover = current_cover;
+        let mut cover_style = Style::default().fg(app.theme.color_text());
+        if !app.config.transparent_sidebar {
+            cover_style = cover_style.bg(app.theme.color_surface());
+        }
         f.render_widget(
             Paragraph::new(ascii)
-                .style(
-                    Style::default()
-                        .bg(app.theme.color_surface())
-                        .fg(app.theme.color_text()),
-                )
+                .style(cover_style)
                 .wrap(Wrap { trim: false }),
             cover,
         );
@@ -274,6 +278,11 @@ fn render_multi_album_hint_bars(f: &mut Frame, area: Rect, cover: Rect, app: &Ap
         return;
     }
 
+    let mut hint_style = Style::default().fg(app.theme.color_subtext());
+    if !app.config.transparent_sidebar {
+        hint_style = hint_style.bg(app.theme.color_surface());
+    }
+
     if app.local_view_album_index > 0 {
         // Stick to playlist border (inside)
         let left = Rect {
@@ -284,11 +293,7 @@ fn render_multi_album_hint_bars(f: &mut Frame, area: Rect, cover: Rect, app: &Ap
         };
         let s = (0..h).map(|_| "▒\n").collect::<String>();
         f.render_widget(
-            Paragraph::new(s).style(
-                Style::default()
-                    .fg(app.theme.color_subtext())
-                    .bg(app.theme.color_surface()),
-            ),
+            Paragraph::new(s).style(hint_style),
             left,
         );
     }
@@ -302,11 +307,7 @@ fn render_multi_album_hint_bars(f: &mut Frame, area: Rect, cover: Rect, app: &Ap
         };
         let s = (0..h).map(|_| "▒\n").collect::<String>();
         f.render_widget(
-            Paragraph::new(s).style(
-                Style::default()
-                    .fg(app.theme.color_subtext())
-                    .bg(app.theme.color_surface()),
-            ),
+            Paragraph::new(s).style(hint_style),
             right,
         );
     }
@@ -317,12 +318,12 @@ fn render_separator(f: &mut Frame, area: Rect, app: &AppState) {
         return;
     }
     let line = "─".repeat(area.width as usize);
+    let mut style = Style::default().fg(app.theme.color_subtext());
+    if !app.config.transparent_sidebar {
+        style = style.bg(app.theme.color_surface());
+    }
     f.render_widget(
-        Paragraph::new(line).style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        ),
+        Paragraph::new(line).style(style),
         area,
     );
 }
@@ -354,12 +355,11 @@ fn render_playlist_list(f: &mut Frame, area: Rect, app: &AppState) {
     let mut lines: Vec<Line> = Vec::new();
 
     if total == 0 {
-        lines.push(Line::styled(
-            "(empty)",
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        ));
+        let mut style = Style::default().fg(app.theme.color_subtext());
+        if !app.config.transparent_sidebar {
+            style = style.bg(app.theme.color_surface());
+        }
+        lines.push(Line::styled("(empty)", style));
     } else {
         let max_w = area.width as usize;
         for i in start..end {
@@ -367,9 +367,10 @@ fn render_playlist_list(f: &mut Frame, area: Rect, app: &AppState) {
             let is_current = app.playlist_view.current == Some(i);
             let raw = format!("{:02}. {}", i + 1, it.title);
             let label = clip_with_ellipsis(&raw, max_w);
-            let mut style = Style::default()
-                .fg(app.theme.color_text())
-                .bg(app.theme.color_surface());
+            let mut style = Style::default().fg(app.theme.color_text());
+            if !app.config.transparent_sidebar {
+                style = style.bg(app.theme.color_surface());
+            }
             if i == app.playlist_view.selected {
                 style = Style::default()
                     .fg(app.theme.color_base())
@@ -386,7 +387,11 @@ fn render_playlist_list(f: &mut Frame, area: Rect, app: &AppState) {
 
     // No in-panel shortcut hint; see Keys modal.
 
-    let p = Paragraph::new(lines).style(Style::default().bg(app.theme.color_surface()));
+    let mut p_style = Style::default();
+    if !app.config.transparent_sidebar {
+        p_style = p_style.bg(app.theme.color_surface());
+    }
+    let p = Paragraph::new(lines).style(p_style);
     f.render_widget(p, area);
 }
 
@@ -563,14 +568,14 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
     // solid background for playlist overlay
     f.render_widget(ratatui::widgets::Clear, area);
 
+    let mut block_style = Style::default().fg(app.theme.color_subtext());
+    if !app.config.transparent_sidebar {
+        block_style = block_style.bg(app.theme.color_surface());
+    }
     let block = Block::default()
         .borders(Borders::ALL)
         .border_set(SOLID_BORDER)
-        .style(
-            Style::default()
-                .fg(app.theme.color_subtext())
-                .bg(app.theme.color_surface()),
-        );
+        .style(block_style);
     f.render_widget(block, area);
 
     let l = compute_layout(area, app);
@@ -649,5 +654,39 @@ mod tests {
         assert_eq!(layout.cover_area.height, 0);
         assert_eq!(layout.list_area, inner);
         assert_eq!(layout.list_inner, inner);
+    }
+
+    #[test]
+    fn test_playlist_panel_renders_transparent_sidebar() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+
+        let mut app = test_app_state();
+        app.theme.capability = ColorCapability::TrueColor;
+        app.theme.palette.surface = (30, 40, 50);
+
+        // When transparent_sidebar is false, outer block has surface background
+        app.config.transparent_sidebar = false;
+        let backend = TestBackend::new(20, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render(f, Rect::new(0, 0, 20, 10), &mut app);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::Rgb(30, 40, 50));
+
+        // When transparent_sidebar is true, outer block background is transparent (Reset)
+        app.config.transparent_sidebar = true;
+        let backend = TestBackend::new(20, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render(f, Rect::new(0, 0, 20, 10), &mut app);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::Reset);
     }
 }

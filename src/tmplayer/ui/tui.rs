@@ -178,8 +178,12 @@ impl Tui {
             let mut base_style = Style::default().fg(app.theme.color_text());
             if !app.config.transparent_background {
                 base_style = base_style.bg(app.theme.color_base());
+                if app.config.transparent_sidebar {
+                    f.render_widget(ratatui::widgets::Block::default().style(base_style), cols[1]);
+                } else {
+                    f.render_widget(ratatui::widgets::Block::default().style(base_style), size);
+                }
             }
-            f.render_widget(ratatui::widgets::Block::default().style(base_style), size);
 
             info_panel::render(f, cols[0], app);
             visual_panel::render(f, rows[0], rows[1], app);
@@ -216,15 +220,15 @@ impl Tui {
                     if collapsing {
                         // Closing animation only needs the panel shell; skip expensive list/cover rendering.
                         f.render_widget(ratatui::widgets::Clear, r);
+                        let mut block_style = Style::default().fg(app.theme.color_subtext());
+                        if !app.config.transparent_sidebar {
+                            block_style = block_style.bg(app.theme.color_surface());
+                        }
                         f.render_widget(
                             Block::default()
                                 .borders(Borders::ALL)
                                 .border_set(crate::tmplayer::ui::borders::SOLID_BORDER)
-                                .style(
-                                    Style::default()
-                                        .fg(app.theme.color_subtext())
-                                        .bg(app.theme.color_surface()),
-                                ),
+                                .style(block_style),
                             r,
                         );
                     } else {
@@ -569,7 +573,7 @@ fn render_transparency_settings_modal(
             lang_on_off(app, app.config.transparent_background).to_string(),
         ),
         (
-            lang_text(app, "个人中心透明", "Personal Center Transparent"),
+            lang_text(app, "侧边栏透明", "Transparent Sidebar"),
             lang_on_off(app, app.config.transparent_sidebar).to_string(),
         ),
         (

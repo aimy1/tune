@@ -243,7 +243,7 @@ fn draw_transparency_settings(frame: &mut Frame, app: &mut App, area: Rect, inne
             on_off(app, app.config.transparent_background).to_string(),
         ),
         (
-            l(app, "个人中心透明", "Personal Center Transparent"),
+            l(app, "侧边栏透明", "Transparent Sidebar"),
             on_off(app, app.config.transparent_sidebar).to_string(),
         ),
         (

@@ -142,10 +142,14 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
 }
 
 pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
+    let mut b_style = Style::default().fg(app.theme.color_subtext());
+    if !app.config.transparent_sidebar {
+        b_style = b_style.bg(app.theme.color_surface());
+    }
     let b = Block::default()
         .borders(Borders::ALL)
         .border_set(SOLID_BORDER)
-        .style(Style::default().fg(app.theme.color_subtext()));
+        .style(b_style);
     f.render_widget(b, area);
 
     let l = layout(area);
@@ -739,6 +743,56 @@ mod tests {
         assert_eq!(l.heart.y, l.meta.y);
         assert_eq!(l.heart.width, 3);
         assert_eq!(l.heart.x, l.meta.x + l.meta.width - 3);
+    }
+
+    #[test]
+    fn test_info_panel_renders_transparent_sidebar() {
+        use crate::data::config::Language;
+        use crate::tmplayer::data::config::Config;
+        use crate::tmplayer::ui::theme::{ColorCapability, Theme, ThemeName, ThemePalette};
+
+        let mut app = AppState::new(
+            Config::default(),
+            Theme {
+                name: ThemeName::System,
+                palette: ThemePalette {
+                    text: (0, 0, 0),
+                    subtext: (0, 0, 0),
+                    base: (0, 0, 0),
+                    surface: (30, 40, 50),
+                    buff: (10, 10, 10),
+                    accent: (0, 0, 0),
+                    accent2: (0, 0, 0),
+                    accent3: (0, 0, 0),
+                },
+                capability: ColorCapability::TrueColor,
+            },
+            Language::Zh,
+        );
+
+        // When transparent_sidebar is false, outer block has surface background
+        app.config.transparent_sidebar = false;
+        let backend = TestBackend::new(20, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render(f, Rect::new(0, 0, 20, 10), &mut app);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::Rgb(30, 40, 50));
+
+        // When transparent_sidebar is true, outer block background is transparent (Reset)
+        app.config.transparent_sidebar = true;
+        let backend = TestBackend::new(20, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|f| {
+                render(f, Rect::new(0, 0, 20, 10), &mut app);
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::Reset);
     }
 }
 
