@@ -171,6 +171,7 @@ pub fn draw_settings(frame: &mut Frame, app: &mut App) {
     if matches!(
         app.overlay,
         Some(Overlay::Settings)
+            | Some(Overlay::SettingsTransparency)
             | Some(Overlay::SettingsPlayback)
             | Some(Overlay::SettingsDesktopLyrics)
             | Some(Overlay::SettingsKeybinds)

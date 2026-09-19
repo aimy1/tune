@@ -4523,7 +4523,7 @@ impl App {
                 }
                 _ => self.apply_settings_root_delta(1).await,
             },
-            KeyCode::Enter => match self.settings_selected {
+            KeyCode::Enter | KeyCode::Char(' ') => match self.settings_selected {
                 0 | 2 | 3 => self.apply_settings_root_delta(1).await,
                 1 => {
                     self.settings_transparency_selected = 0;
@@ -4565,7 +4565,11 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.apply_settings_transparency_delta(-1);
             }
-            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
+            KeyCode::Right
+            | KeyCode::Char('l')
+            | KeyCode::Char('L')
+            | KeyCode::Enter
+            | KeyCode::Char(' ') => {
                 self.apply_settings_transparency_delta(1);
             }
             KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
@@ -4623,7 +4627,11 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.apply_settings_playback_delta(-1);
             }
-            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
+            KeyCode::Right
+            | KeyCode::Char('l')
+            | KeyCode::Char('L')
+            | KeyCode::Enter
+            | KeyCode::Char(' ') => {
                 self.apply_settings_playback_delta(1);
             }
             KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
@@ -4652,7 +4660,11 @@ impl App {
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => {
                 self.apply_settings_desktop_lyrics_delta(-1);
             }
-            KeyCode::Right | KeyCode::Char('l') | KeyCode::Char('L') | KeyCode::Enter => {
+            KeyCode::Right
+            | KeyCode::Char('l')
+            | KeyCode::Char('L')
+            | KeyCode::Enter
+            | KeyCode::Char(' ') => {
                 self.apply_settings_desktop_lyrics_delta(1);
             }
             KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => {
@@ -8118,5 +8130,28 @@ mod tests {
         })
         .await;
         assert_eq!(app.overlay, Some(Overlay::Settings));
+    }
+
+    #[tokio::test]
+    async fn test_draw_settings_renders_transparency_modal() {
+        use ratatui::backend::TestBackend;
+        use ratatui::Terminal;
+
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::SettingsTransparency);
+        app.settings_modal_hits = SettingsModalHits::default();
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| {
+                crate::ui::draw_settings(frame, &mut app);
+            })
+            .unwrap();
+
+        // Ensure modal_area and list_area were populated during render
+        assert!(app.settings_modal_hits.modal_area.is_some());
+        assert!(app.settings_modal_hits.list_area.is_some());
+        assert_eq!(app.settings_modal_hits.list_count, SETTINGS_TRANSPARENCY_ITEMS);
     }
 }

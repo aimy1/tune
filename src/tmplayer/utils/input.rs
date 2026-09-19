@@ -113,7 +113,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         return match ev.code {
             KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
             KeyCode::Char('t') | KeyCode::Char('T') => Action::CloseOverlay,
-            KeyCode::Enter => Action::Confirm,
+            KeyCode::Enter | KeyCode::Char(' ') => Action::Confirm,
             KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => Action::ModalUp,
             KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => Action::ModalDown,
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => Action::ModalLeft,
@@ -133,7 +133,7 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         }
         return match ev.code {
             KeyCode::Esc | KeyCode::Backspace => Action::CloseOverlay,
-            KeyCode::Enter => Action::Confirm,
+            KeyCode::Enter | KeyCode::Char(' ') => Action::Confirm,
             KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') | KeyCode::Char('K') => Action::ModalUp,
             KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') | KeyCode::Char('J') => Action::ModalDown,
             KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('H') => Action::ModalLeft,
