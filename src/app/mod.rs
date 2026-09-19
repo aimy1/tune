@@ -61,7 +61,7 @@ const MAX_INPUT_LEN: usize = 64;
 const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
-pub(crate) const SETTINGS_ROOT_ITEMS: usize = 11;
+pub(crate) const SETTINGS_ROOT_ITEMS: usize = 12;
 pub(crate) const SETTINGS_PLAYBACK_ITEMS: usize = 10;
 pub(crate) const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 21;
@@ -2018,6 +2018,10 @@ impl App {
     }
 
     pub async fn handle_mouse(&mut self, mouse: MouseEvent) {
+        if !self.config.mouse_support {
+            return;
+        }
+
         if self.page == Page::Login || self.page == Page::Loading {
             return;
         }
@@ -4490,8 +4494,8 @@ impl App {
                 6 => {
                     self.open_keybind_settings();
                 }
-                9 => self.logout_to_login().await,
-                10 => {
+                10 => self.logout_to_login().await,
+                11 => {
                     self.overlay = Some(Overlay::SettingsAbout);
                 }
                 _ => self.apply_settings_root_delta(1).await,
@@ -4512,8 +4516,9 @@ impl App {
                 }
                 7 => self.apply_settings_root_delta(1).await,
                 8 => self.apply_settings_root_delta(1).await,
-                9 => self.logout_to_login().await,
-                10 => {
+                9 => self.apply_settings_root_delta(1).await,
+                10 => self.logout_to_login().await,
+                11 => {
                     self.overlay = Some(Overlay::SettingsAbout);
                 }
                 _ => {}
@@ -4749,11 +4754,32 @@ impl App {
             }
             7 => {
                 if delta != 0 {
-                    self.config.show_hints = !self.config.show_hints;
+                    self.config.mouse_support = !self.config.mouse_support;
+                    if self.config.mouse_support {
+                        let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
+                        self.set_runtime_status(if self.config.language == Language::Zh {
+                            "鼠标支持已开启"
+                        } else {
+                            "Mouse support enabled"
+                        });
+                    } else {
+                        let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
+                        self.set_runtime_status(if self.config.language == Language::Zh {
+                            "鼠标支持已关闭"
+                        } else {
+                            "Mouse support disabled"
+                        });
+                    }
                     let _ = self.config.save();
                 }
             }
             8 => {
+                if delta != 0 {
+                    self.config.show_hints = !self.config.show_hints;
+                    let _ = self.config.save();
+                }
+            }
+            9 => {
                 if delta != 0 {
                     self.config.home_more_recommend = !self.config.home_more_recommend;
                     let _ = self.config.save();
@@ -5563,13 +5589,13 @@ impl App {
                         6 => {
                             self.open_keybind_settings();
                         }
-                        9 => {
+                        10 => {
                             self.logout_to_login().await;
                         }
-                        10 => {
+                        11 => {
                             self.overlay = Some(Overlay::SettingsAbout);
                         }
-                        1 | 7 | 8 => {
+                        1 | 7 | 8 | 9 => {
                             self.apply_settings_root_delta(1).await;
                         }
                         0 | 2 | 3 => {
@@ -5690,6 +5716,7 @@ impl App {
         crate::tmplayer::HostConfigSync {
             theme: self.config.theme.clone(),
             transparent_background: self.config.transparent_background,
+            mouse_support: self.config.mouse_support,
             album_border: self.config.album_border,
             language: self.config.language,
             graphics_protocol: self.config.graphics_protocol,
@@ -5750,6 +5777,16 @@ impl App {
 
         if self.config.transparent_background != sync.transparent_background {
             self.config.transparent_background = sync.transparent_background;
+            changed = true;
+        }
+
+        if self.config.mouse_support != sync.mouse_support {
+            self.config.mouse_support = sync.mouse_support;
+            if self.config.mouse_support {
+                let _ = crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture);
+            } else {
+                let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
+            }
             changed = true;
         }
 
@@ -7826,5 +7863,63 @@ mod tests {
         })
         .await;
         assert_eq!(app.settings_selected, SETTINGS_ROOT_ITEMS - 1);
+    }
+
+    #[tokio::test]
+    async fn test_settings_mouse_support_toggle_and_guard() {
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::Settings);
+        assert!(app.config.mouse_support);
+
+        // Click on item 7 (row 7 + 7 = 14): Mouse Support toggle
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 14,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.config.mouse_support, false);
+
+        // While mouse_support is false, clicking item 1 (row 7 + 1 = 8: Transparent background) must be ignored
+        let initial_transparent = app.config.transparent_background;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 8,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.config.transparent_background, initial_transparent);
+
+        // While mouse_support is false, scrolling must be ignored
+        app.settings_selected = 0;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: 20,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.settings_selected, 0);
+
+        // Re-enable mouse_support using keyboard navigation on item 7
+        app.settings_selected = 7;
+        app.handle_settings_root_key(crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Enter,
+            crossterm::event::KeyModifiers::empty(),
+        ))
+        .await;
+        assert_eq!(app.config.mouse_support, true);
+
+        // Now mouse clicks should work again
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 8,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.config.transparent_background, !initial_transparent);
     }
 }

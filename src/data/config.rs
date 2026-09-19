@@ -139,6 +139,9 @@ pub struct Config {
     #[serde(default)]
     pub transparent_background: bool,
 
+    #[serde(default = "default_mouse_support")]
+    pub mouse_support: bool,
+
     #[serde(default = "default_album_border")]
     pub album_border: bool,
 
@@ -561,6 +564,10 @@ fn default_show_hints() -> bool {
     true
 }
 
+fn default_mouse_support() -> bool {
+    true
+}
+
 fn default_volume() -> f32 {
     1.0
 }
@@ -865,6 +872,7 @@ impl Default for Config {
             visualize: default_visualize(),
             eq_bands_db: default_eq_bands_db(),
             transparent_background: true,
+            mouse_support: true,
             album_border: default_album_border(),
             graphics_protocol: GraphicsProtocol::default(),
             kitty_cover_scale_percent: default_kitty_cover_scale_percent(),

@@ -58,12 +58,16 @@ impl Tui {
         })
     }
 
-    pub fn enter(&mut self) -> Result<()> {
-        execute!(
-            io::stdout(),
-            EnterAlternateScreen,
-            event::EnableMouseCapture
-        )?;
+    pub fn enter(&mut self, mouse_support: bool) -> Result<()> {
+        if mouse_support {
+            execute!(
+                io::stdout(),
+                EnterAlternateScreen,
+                event::EnableMouseCapture
+            )?;
+        } else {
+            execute!(io::stdout(), EnterAlternateScreen)?;
+        }
         terminal::enable_raw_mode()?;
         Ok(())
     }
@@ -447,6 +451,10 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
         (
             lang_text(app, "按键绑定", "Keybinds"),
             "...".to_string(),
+        ),
+        (
+            lang_text(app, "鼠标支持", "Mouse Support"),
+            lang_on_off(app, app.config.mouse_support).to_string(),
         ),
         (
             lang_text(app, "显示提示", "Show Hints"),
@@ -1961,7 +1969,7 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
         }
         if contains(rows[1], col, row) {
             let idx = (row.saturating_sub(rows[1].y)) as usize;
-            if idx < 11 {
+            if idx < 12 {
                 return Some(Action::SettingsClickItem {
                     index: idx,
                     is_right: col >= inner.x + inner.width / 2,

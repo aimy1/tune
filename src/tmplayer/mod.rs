@@ -102,6 +102,7 @@ pub struct HostPlaybackRuntimeSnapshot {
 pub struct HostConfigSync {
     pub theme: String,
     pub transparent_background: bool,
+    pub mouse_support: bool,
     pub album_border: bool,
     pub language: HostLanguage,
     pub graphics_protocol: GraphicsProtocol,
@@ -196,6 +197,7 @@ fn tm_config_from_host(host: &HostConfig) -> data::config::Config {
         },
         eq_bands_db: host.eq_bands_db,
         transparent_background: host.transparent_background,
+        mouse_support: host.mouse_support,
         page_lyrics: host.page_lyrics,
         desktop_lyrics: host.desktop_lyrics,
         desktop_lyrics_locked: host.desktop_lyrics_locked,

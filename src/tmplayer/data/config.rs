@@ -28,6 +28,9 @@ pub struct Config {
     #[serde(default)]
     pub transparent_background: bool,
 
+    #[serde(default = "default_mouse_support")]
+    pub mouse_support: bool,
+
     #[serde(default = "default_album_border")]
     pub album_border: bool,
 
@@ -313,6 +316,10 @@ fn default_album_border() -> bool {
     true
 }
 
+fn default_mouse_support() -> bool {
+    true
+}
+
 fn default_eq_bands_db() -> [f32; crate::tmplayer::app::state::EQ_BANDS] {
     DEFAULT_EQ_BANDS_DB
 }
@@ -465,6 +472,7 @@ impl Default for Config {
             visualize: default_visualize(),
             eq_bands_db: default_eq_bands_db(),
             transparent_background: false,
+            mouse_support: true,
             album_border: default_album_border(),
             graphics_protocol: GraphicsProtocol::default(),
             page_lyrics: false,

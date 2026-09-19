@@ -136,6 +136,10 @@ fn draw_root_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect)
             "...".to_string(),
         ),
         (
+            l(app, "鼠标支持", "Mouse Support"),
+            on_off(app, app.config.mouse_support).to_string(),
+        ),
+        (
             l(app, "显示提示", "Show Hints"),
             on_off(app, app.config.show_hints).to_string(),
         ),

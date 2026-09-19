@@ -142,6 +142,7 @@ fn host_config_sync_from_app(app: &AppState) -> HostConfigSync {
     HostConfigSync {
         theme: app.config.theme.clone(),
         transparent_background: app.config.transparent_background,
+        mouse_support: app.config.mouse_support,
         album_border: app.config.album_border,
         language: app.language,
         graphics_protocol: app.config.graphics_protocol,
@@ -221,6 +222,14 @@ fn apply_host_config_sync(app: &mut AppState, config: HostConfigSync) {
     }
 
     app.config.transparent_background = config.transparent_background;
+    if app.config.mouse_support != config.mouse_support {
+        app.config.mouse_support = config.mouse_support;
+        if app.config.mouse_support {
+            let _ = crossterm::execute!(std::io::stdout(), event::EnableMouseCapture);
+        } else {
+            let _ = crossterm::execute!(std::io::stdout(), event::DisableMouseCapture);
+        }
+    }
     app.config.album_border = config.album_border;
     app.language = config.language;
     app.config.page_lyrics = config.page_lyrics;
@@ -595,7 +604,7 @@ pub async fn run(
 ) -> Result<crate::tmplayer::FullscreenExit> {
     enable_raw_mode()?;
     let mut tui = Tui::new(app)?;
-    tui.enter()?;
+    tui.enter(app.config.mouse_support)?;
 
     let mut mode_manager = ModeManager::new();
 
@@ -709,17 +718,19 @@ pub async fn run(
                     }
                 }
                 Event::Mouse(m) => {
-                    let action = map_mouse(m);
-                    handle_action(
-                        app,
-                        &mut mode_manager,
-                        system_volume.as_ref(),
-                        &mut host_bridge,
-                        action,
-                        &last_layout,
-                    )
-                    .await?;
-                    state_changed = true;
+                    if app.config.mouse_support {
+                        let action = map_mouse(m);
+                        handle_action(
+                            app,
+                            &mut mode_manager,
+                            system_volume.as_ref(),
+                            &mut host_bridge,
+                            action,
+                            &last_layout,
+                        )
+                        .await?;
+                        state_changed = true;
+                    }
                 }
                 Event::Resize(_, _) => {
                     // Kitty graphics placements may get cleared on terminal resize.
@@ -1280,9 +1291,12 @@ async fn handle_action(
                     apply_settings_delta(app, host_bridge, 1).await;
                 }
                 9 => {
-                    app.set_toast("Logout is unavailable in fullscreen");
+                    apply_settings_delta(app, host_bridge, 1).await;
                 }
                 10 => {
+                    app.set_toast("Logout is unavailable in fullscreen");
+                }
+                11 => {
                     app.overlay = Overlay::AboutModal;
                 }
                 _ => {}
@@ -1645,7 +1659,7 @@ async fn handle_action(
                         app.help_keybind_selected = 0;
                         app.overlay = Overlay::HelpModal;
                     }
-                    10 => {
+                    11 => {
                         app.overlay = Overlay::AboutModal;
                     }
                     _ => {
@@ -2080,7 +2094,7 @@ async fn handle_action(
             }
         }
         Action::SettingsClickItem { index, is_right } => {
-            if app.overlay == Overlay::SettingsModal && index < 11 {
+            if app.overlay == Overlay::SettingsModal && index < 12 {
                 let prev = app.settings_selected;
                 app.settings_selected = index;
                 match index {
@@ -2101,13 +2115,13 @@ async fn handle_action(
                         app.help_keybind_selected = 0;
                         app.overlay = Overlay::HelpModal;
                     }
-                    7 | 8 => {
+                    7 | 8 | 9 => {
                         apply_settings_delta(app, host_bridge, 1).await;
                     }
-                    9 => {
+                    10 => {
                         app.set_toast("Logout is unavailable in fullscreen");
                     }
-                    10 => {
+                    11 => {
                         app.overlay = Overlay::AboutModal;
                     }
                     _ => {}
@@ -2246,15 +2260,27 @@ async fn apply_settings_delta(
                 save_and_sync_host_config(app, host_bridge).await;
             }
         }
-        // Show hints
+        // Mouse support
         7 => {
+            if delta != 0 {
+                app.config.mouse_support = !app.config.mouse_support;
+                if app.config.mouse_support {
+                    let _ = crossterm::execute!(std::io::stdout(), event::EnableMouseCapture);
+                } else {
+                    let _ = crossterm::execute!(std::io::stdout(), event::DisableMouseCapture);
+                }
+                save_and_sync_host_config(app, host_bridge).await;
+            }
+        }
+        // Show hints
+        8 => {
             if delta != 0 {
                 app.config.show_hints = !app.config.show_hints;
                 save_and_sync_host_config(app, host_bridge).await;
             }
         }
         // Home more recommendations
-        8 => {
+        9 => {
             if delta != 0 {
                 app.config.home_more_recommend = !app.config.home_more_recommend;
                 save_and_sync_host_config(app, host_bridge).await;

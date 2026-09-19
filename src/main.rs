@@ -187,7 +187,7 @@ async fn main() -> Result<()> {
         });
     let mut app = App::new(config, theme).await?;
 
-    let mut terminal = init_terminal()?;
+    let mut terminal = init_terminal(app.config.mouse_support)?;
     app.graphics_picker = crate::data::config::resolve_picker(app.config.graphics_protocol);
     let run_result = run_app(&mut terminal, &mut app).await;
     restore_terminal(&mut terminal)?;
@@ -204,10 +204,14 @@ fn install_panic_hook() {
     }));
 }
 
-fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
+fn init_terminal(mouse_support: bool) -> Result<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    if mouse_support {
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    } else {
+        execute!(stdout, EnterAlternateScreen)?;
+    }
     let backend = CrosstermBackend::new(stdout);
     Ok(Terminal::new(backend)?)
 }
@@ -288,8 +292,10 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Ap
                     }
                 }
                 Event::Mouse(mouse) => {
-                    app.handle_mouse(mouse).await;
-                    needs_redraw = true;
+                    if app.config.mouse_support {
+                        app.handle_mouse(mouse).await;
+                        needs_redraw = true;
+                    }
                 }
                 Event::Resize(_, _) => {
                     let _ = terminal.clear();
@@ -339,7 +345,7 @@ async fn launch_tmplayer_fullscreen(
         Err(err) => format!("TMPlayer 运行失败: {}", err),
     };
 
-    *terminal = init_terminal()?;
+    *terminal = init_terminal(app.config.mouse_support)?;
     app.resume_main_cava_after_fullscreen();
     play_fullscreen_transition(terminal, app, false).await?;
     if !status_text.is_empty() {
