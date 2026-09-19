@@ -1867,6 +1867,22 @@ async fn handle_action(
             }
         }
         Action::VolumeUp => {
+            if app.overlay == Overlay::SettingsModal
+                || app.overlay == Overlay::BarSettingsModal
+                || app.overlay == Overlay::DesktopLyricsSettingsModal
+                || app.overlay == Overlay::HelpModal
+            {
+                Box::pin(handle_action(
+                    app,
+                    mode_manager,
+                    system_volume,
+                    host_bridge,
+                    Action::ModalUp,
+                    layout,
+                ))
+                .await?;
+                return Ok(());
+            }
             if let Some(bridge) = host_bridge.as_mut() {
                 let cur = (*bridge).volume();
                 let next = (cur + 0.05).min(1.0);
@@ -1901,6 +1917,22 @@ async fn handle_action(
             }
         }
         Action::VolumeDown => {
+            if app.overlay == Overlay::SettingsModal
+                || app.overlay == Overlay::BarSettingsModal
+                || app.overlay == Overlay::DesktopLyricsSettingsModal
+                || app.overlay == Overlay::HelpModal
+            {
+                Box::pin(handle_action(
+                    app,
+                    mode_manager,
+                    system_volume,
+                    host_bridge,
+                    Action::ModalDown,
+                    layout,
+                ))
+                .await?;
+                return Ok(());
+            }
             if let Some(bridge) = host_bridge.as_mut() {
                 let cur = (*bridge).volume();
                 let next = (cur - 0.05).max(0.0);
@@ -2045,6 +2077,74 @@ async fn handle_action(
                 PlayMode::Idle => {
                     app.player.position = target;
                 }
+            }
+        }
+        Action::SettingsClickItem { index, is_right } => {
+            if app.overlay == Overlay::SettingsModal && index < 11 {
+                let prev = app.settings_selected;
+                app.settings_selected = index;
+                match index {
+                    0..=3 => {
+                        let delta = if is_right || prev == index { 1 } else { -1 };
+                        apply_settings_delta(app, host_bridge, delta).await;
+                    }
+                    4 => {
+                        app.bar_settings_selected = 0;
+                        app.overlay = Overlay::BarSettingsModal;
+                    }
+                    5 => {
+                        app.desktop_lyrics_settings_selected = 0;
+                        app.desktop_lyrics_settings_return_overlay = Overlay::SettingsModal;
+                        app.overlay = Overlay::DesktopLyricsSettingsModal;
+                    }
+                    6 => {
+                        app.help_keybind_selected = 0;
+                        app.overlay = Overlay::HelpModal;
+                    }
+                    7 | 8 => {
+                        apply_settings_delta(app, host_bridge, 1).await;
+                    }
+                    9 => {
+                        app.set_toast("Logout is unavailable in fullscreen");
+                    }
+                    10 => {
+                        app.overlay = Overlay::AboutModal;
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Action::BarSettingsClickItem { index, is_right } => {
+            if app.overlay == Overlay::BarSettingsModal && index < 10 {
+                let prev = app.bar_settings_selected;
+                app.bar_settings_selected = index;
+                let action = if is_right || prev == index {
+                    Action::ModalRight
+                } else {
+                    Action::ModalLeft
+                };
+                Box::pin(handle_action(
+                    app,
+                    mode_manager,
+                    system_volume,
+                    host_bridge,
+                    action,
+                    layout,
+                ))
+                .await?;
+            }
+        }
+        Action::DesktopLyricsSettingsClickItem { index, is_right } => {
+            if app.overlay == Overlay::DesktopLyricsSettingsModal && index < 9 {
+                let prev = app.desktop_lyrics_settings_selected;
+                app.desktop_lyrics_settings_selected = index;
+                let delta = if is_right || prev == index { 1 } else { -1 };
+                apply_desktop_lyrics_settings_delta(app, host_bridge, delta).await;
+            }
+        }
+        Action::HelpSelect(index) => {
+            if app.overlay == Overlay::HelpModal {
+                app.help_keybind_selected = index.min(16);
             }
         }
         Action::MouseClick { col, row } => {

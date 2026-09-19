@@ -61,9 +61,9 @@ const MAX_INPUT_LEN: usize = 64;
 const SEARCH_RESULT_PAGE_SIZE: usize = 50;
 const SEARCH_BOX_TARGET_HEIGHT: u16 = 3;
 const HOME_SIDEBAR_PLAYLIST_LIMIT: usize = 100;
-const SETTINGS_ROOT_ITEMS: usize = 11;
-const SETTINGS_PLAYBACK_ITEMS: usize = 10;
-const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
+pub(crate) const SETTINGS_ROOT_ITEMS: usize = 11;
+pub(crate) const SETTINGS_PLAYBACK_ITEMS: usize = 10;
+pub(crate) const SETTINGS_DESKTOP_LYRICS_ITEMS: usize = 9;
 pub(crate) const SETTINGS_KEYBIND_ITEMS: usize = 21;
 const CONTENT_DOUBLE_CLICK_MS: u64 = 400;
 const GLOBAL_HOTKEY_COOLDOWN_MS: u64 = 120;
@@ -1527,6 +1527,15 @@ pub struct PlayerBarHitTargets {
     pub progress: Option<HitRect>,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SettingsModalHits {
+    pub modal_area: Option<HitRect>,
+    pub list_area: Option<HitRect>,
+    pub footer_area: Option<HitRect>,
+    pub list_scroll: usize,
+    pub list_count: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct FullscreenPlaybackSnapshot {
     pub queue: Vec<PlaybackTrack>,
@@ -1642,6 +1651,7 @@ pub struct App {
     pub playback_state: PlaybackRuntimeState,
     pub startup_loading_progress: f32,
     pub player_bar_hits: PlayerBarHitTargets,
+    pub settings_modal_hits: SettingsModalHits,
     pub user_profile_hit: Option<HitRect>,
     pub header_home_hit: Option<HitRect>,
     pub home_sidebar_panel_hit: Option<HitRect>,
@@ -1784,6 +1794,7 @@ impl App {
             playback_state: PlaybackRuntimeState::Stopped,
             startup_loading_progress: 0.0,
             player_bar_hits: PlayerBarHitTargets::default(),
+            settings_modal_hits: SettingsModalHits::default(),
             user_profile_hit: None,
             header_home_hit: None,
             home_sidebar_panel_hit: None,
@@ -2020,6 +2031,41 @@ impl App {
                     self.volume_up();
                     return;
                 }
+                if matches!(self.overlay, Some(Overlay::Settings)) {
+                    if self.settings_selected == 0 {
+                        self.settings_selected = SETTINGS_ROOT_ITEMS - 1;
+                    } else {
+                        self.settings_selected -= 1;
+                    }
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsPlayback)) {
+                    if self.settings_playback_selected == 0 {
+                        self.settings_playback_selected = SETTINGS_PLAYBACK_ITEMS - 1;
+                    } else {
+                        self.settings_playback_selected -= 1;
+                    }
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsDesktopLyrics)) {
+                    if self.settings_desktop_lyrics_selected == 0 {
+                        self.settings_desktop_lyrics_selected = SETTINGS_DESKTOP_LYRICS_ITEMS - 1;
+                    } else {
+                        self.settings_desktop_lyrics_selected -= 1;
+                    }
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsKeybinds)) {
+                    if self.settings_keybind_selected == 0 {
+                        self.settings_keybind_selected = SETTINGS_KEYBIND_ITEMS - 1;
+                    } else {
+                        self.settings_keybind_selected -= 1;
+                    }
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsAbout)) {
+                    return;
+                }
                 if let Some(rect) = self.player_bar_hits.volume {
                     if rect.contains(col, row) {
                         self.volume_up();
@@ -2031,6 +2077,28 @@ impl App {
             MouseEventKind::ScrollDown => {
                 if matches!(self.overlay, Some(Overlay::VolumeModal)) {
                     self.volume_down();
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::Settings)) {
+                    self.settings_selected = (self.settings_selected + 1) % SETTINGS_ROOT_ITEMS;
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsPlayback)) {
+                    self.settings_playback_selected =
+                        (self.settings_playback_selected + 1) % SETTINGS_PLAYBACK_ITEMS;
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsDesktopLyrics)) {
+                    self.settings_desktop_lyrics_selected =
+                        (self.settings_desktop_lyrics_selected + 1) % SETTINGS_DESKTOP_LYRICS_ITEMS;
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsKeybinds)) {
+                    self.settings_keybind_selected =
+                        (self.settings_keybind_selected + 1) % SETTINGS_KEYBIND_ITEMS;
+                    return;
+                }
+                if matches!(self.overlay, Some(Overlay::SettingsAbout)) {
                     return;
                 }
                 if let Some(rect) = self.player_bar_hits.volume {
@@ -2054,6 +2122,18 @@ impl App {
                         return;
                     }
                     self.handle_volume_popover_click(col, row);
+                    return;
+                }
+
+                if matches!(
+                    self.overlay,
+                    Some(Overlay::Settings)
+                        | Some(Overlay::SettingsPlayback)
+                        | Some(Overlay::SettingsDesktopLyrics)
+                        | Some(Overlay::SettingsKeybinds)
+                        | Some(Overlay::SettingsAbout)
+                ) {
+                    self.handle_settings_overlay_click(col, row).await;
                     return;
                 }
 
@@ -5310,6 +5390,270 @@ impl App {
     fn close_overlay(&mut self) {
         self.overlay = None;
         self.search_box_anim_height = 0;
+        self.settings_modal_hits = SettingsModalHits::default();
+        self.settings_keybind_rebinding = None;
+    }
+
+    pub fn get_settings_modal_hits(&self) -> SettingsModalHits {
+        if self.settings_modal_hits.modal_area.is_some() {
+            return self.settings_modal_hits;
+        }
+
+        let Ok((term_w, term_h)) = crossterm::terminal::size() else {
+            return SettingsModalHits::default();
+        };
+        let size = ratatui::layout::Rect::new(0, 0, term_w, term_h);
+        if matches!(self.overlay, Some(Overlay::SettingsAbout)) {
+            let area = crate::ui::about::modal_area(size);
+            return SettingsModalHits {
+                modal_area: Some(HitRect {
+                    x: area.x,
+                    y: area.y,
+                    width: area.width,
+                    height: area.height,
+                }),
+                list_area: None,
+                footer_area: None,
+                list_scroll: 0,
+                list_count: 0,
+            };
+        }
+
+        let w = 70.min(term_w.saturating_sub(2)).max(12);
+        let h = 20.min(term_h.saturating_sub(2)).max(5);
+        let area = HitRect {
+            x: term_w.saturating_sub(w) / 2,
+            y: term_h.saturating_sub(h) / 2,
+            width: w,
+            height: h,
+        };
+        let inner_x = area.x.saturating_add(2);
+        let inner_y = area.y.saturating_add(1);
+        let inner_w = area.width.saturating_sub(4);
+        let inner_h = area.height.saturating_sub(2);
+
+        let list_y = inner_y.saturating_add(1);
+        let is_keybinds = matches!(self.overlay, Some(Overlay::SettingsKeybinds));
+        let footer_h: u16 = if is_keybinds { 2 } else { 1 };
+        let list_h = inner_h.saturating_sub(1 + footer_h);
+        let footer_y = list_y.saturating_add(list_h);
+
+        SettingsModalHits {
+            modal_area: Some(area),
+            list_area: Some(HitRect {
+                x: inner_x,
+                y: list_y,
+                width: inner_w,
+                height: list_h,
+            }),
+            footer_area: Some(HitRect {
+                x: inner_x,
+                y: footer_y,
+                width: inner_w,
+                height: footer_h,
+            }),
+            list_scroll: 0,
+            list_count: if is_keybinds {
+                SETTINGS_KEYBIND_ITEMS + 3
+            } else {
+                SETTINGS_ROOT_ITEMS
+            },
+        }
+    }
+
+    pub async fn handle_settings_overlay_click(&mut self, col: u16, row: u16) {
+        let hits = self.get_settings_modal_hits();
+        let Some(modal_area) = hits.modal_area else {
+            return;
+        };
+
+        // 1. Click outside modal box: close or return
+        if !modal_area.contains(col, row) {
+            match self.overlay {
+                Some(Overlay::Settings) => self.close_overlay(),
+                Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
+                Some(Overlay::SettingsDesktopLyrics) => {
+                    self.overlay = Some(self.settings_return_overlay)
+                }
+                Some(Overlay::SettingsKeybinds) => {
+                    self.settings_keybind_rebinding = None;
+                    self.overlay = Some(Overlay::Settings);
+                }
+                Some(Overlay::SettingsAbout) => self.overlay = Some(Overlay::Settings),
+                _ => {}
+            }
+            return;
+        }
+
+        // About modal: clicking anywhere inside closes/returns
+        if matches!(self.overlay, Some(Overlay::SettingsAbout)) {
+            self.overlay = Some(Overlay::Settings);
+            return;
+        }
+
+        // 2. Click top border (close/back button): close or return
+        if row == modal_area.y {
+            match self.overlay {
+                Some(Overlay::Settings) => self.close_overlay(),
+                Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
+                Some(Overlay::SettingsDesktopLyrics) => {
+                    self.overlay = Some(self.settings_return_overlay)
+                }
+                Some(Overlay::SettingsKeybinds) => {
+                    self.settings_keybind_rebinding = None;
+                    self.overlay = Some(Overlay::Settings);
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        // 3. Click footer area: close or return
+        if let Some(footer) = hits.footer_area {
+            if footer.contains(col, row) {
+                match self.overlay {
+                    Some(Overlay::Settings) => self.close_overlay(),
+                    Some(Overlay::SettingsPlayback) => self.overlay = Some(Overlay::Settings),
+                    Some(Overlay::SettingsDesktopLyrics) => {
+                        self.overlay = Some(self.settings_return_overlay)
+                    }
+                    Some(Overlay::SettingsKeybinds) => {
+                        if self.settings_keybind_rebinding.is_some() {
+                            self.settings_keybind_rebinding = None;
+                        } else {
+                            self.overlay = Some(Overlay::Settings);
+                        }
+                    }
+                    _ => {}
+                }
+                return;
+            }
+        }
+
+        // 4. Click list area: item selection and actions
+        let Some(list) = hits.list_area else {
+            return;
+        };
+        if !list.contains(col, row) {
+            return;
+        }
+
+        let clicked_row = (row - list.y) as usize;
+        let item_idx = clicked_row + hits.list_scroll;
+        if item_idx >= hits.list_count {
+            return;
+        }
+        let is_right_half = col >= list.x + list.width / 2;
+
+        match self.overlay {
+            Some(Overlay::Settings) => {
+                if item_idx < SETTINGS_ROOT_ITEMS {
+                    let prev_selected = self.settings_selected;
+                    self.settings_selected = item_idx;
+                    match item_idx {
+                        4 => {
+                            self.settings_playback_selected = 0;
+                            self.overlay = Some(Overlay::SettingsPlayback);
+                        }
+                        5 => {
+                            self.settings_desktop_lyrics_selected = 0;
+                            self.settings_return_overlay = Overlay::Settings;
+                            self.overlay = Some(Overlay::SettingsDesktopLyrics);
+                        }
+                        6 => {
+                            self.open_keybind_settings();
+                        }
+                        9 => {
+                            self.logout_to_login().await;
+                        }
+                        10 => {
+                            self.overlay = Some(Overlay::SettingsAbout);
+                        }
+                        1 | 7 | 8 => {
+                            self.apply_settings_root_delta(1).await;
+                        }
+                        0 | 2 | 3 => {
+                            if is_right_half {
+                                self.apply_settings_root_delta(1).await;
+                            } else if prev_selected == item_idx {
+                                self.apply_settings_root_delta(-1).await;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Some(Overlay::SettingsPlayback) => {
+                if item_idx < SETTINGS_PLAYBACK_ITEMS {
+                    let prev_selected = self.settings_playback_selected;
+                    self.settings_playback_selected = item_idx;
+                    match item_idx {
+                        1 | 2 | 5 | 6 | 8 | 9 => {
+                            self.apply_settings_playback_delta(1);
+                        }
+                        0 | 3 | 4 | 7 => {
+                            if is_right_half {
+                                self.apply_settings_playback_delta(1);
+                            } else if prev_selected == item_idx {
+                                self.apply_settings_playback_delta(-1);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Some(Overlay::SettingsDesktopLyrics) => {
+                if item_idx < SETTINGS_DESKTOP_LYRICS_ITEMS {
+                    let prev_selected = self.settings_desktop_lyrics_selected;
+                    self.settings_desktop_lyrics_selected = item_idx;
+                    match item_idx {
+                        0 | 1 | 4 => {
+                            self.apply_settings_desktop_lyrics_delta(1);
+                        }
+                        8 => {
+                            self.apply_settings_desktop_lyrics_delta(1);
+                        }
+                        2 | 3 | 5 | 6 | 7 => {
+                            if is_right_half {
+                                self.apply_settings_desktop_lyrics_delta(1);
+                            } else if prev_selected == item_idx {
+                                self.apply_settings_desktop_lyrics_delta(-1);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Some(Overlay::SettingsKeybinds) => {
+                if item_idx < SETTINGS_KEYBIND_ITEMS {
+                    if self.settings_keybind_rebinding == Some(item_idx) {
+                        self.settings_keybind_rebinding = None;
+                        self.set_runtime_status(
+                            self.lang_text("已取消快捷键重绑", "Cancelled keybind rebinding"),
+                        );
+                    } else {
+                        self.settings_keybind_selected = item_idx;
+                        self.settings_keybind_rebinding = Some(item_idx);
+                        self.set_runtime_status(format!(
+                            "{} [{}]，{}",
+                            self.lang_text("正在重绑", "Rebinding"),
+                            self.keybind_name_for_index(item_idx),
+                            self.lang_text(
+                                "请按新快捷键（Esc 取消）",
+                                "press a new shortcut (Esc to cancel)"
+                            )
+                        ));
+                    }
+                } else if item_idx == SETTINGS_KEYBIND_ITEMS + 2 {
+                    self.reset_keybinds_to_default();
+                    let _ = self.config.save();
+                    self.set_runtime_status(
+                        self.lang_text("已恢复默认快捷键", "Restored default keybinds"),
+                    );
+                }
+            }
+            _ => {}
+        }
     }
 
     async fn execute_search_from_box(&mut self) {
@@ -7354,4 +7698,133 @@ fn placeholder_cover_ascii(width: u16, height: u16, ch: char) -> String {
         out.push('\n');
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
+    async fn create_test_app() -> App {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let config = Config::default();
+        let theme = ThemeLoader::load_with_overrides("hyprland", None).unwrap();
+        let mut app = App::new(config, theme).await.unwrap();
+        app.page = Page::Home;
+        app.settings_modal_hits = SettingsModalHits {
+            modal_area: Some(HitRect {
+                x: 10,
+                y: 5,
+                width: 60,
+                height: 20,
+            }),
+            list_area: Some(HitRect {
+                x: 12,
+                y: 7,
+                width: 56,
+                height: 15,
+            }),
+            footer_area: Some(HitRect {
+                x: 12,
+                y: 23,
+                width: 56,
+                height: 1,
+            }),
+            list_scroll: 0,
+            list_count: SETTINGS_ROOT_ITEMS,
+        };
+        app
+    }
+
+    #[tokio::test]
+    async fn test_settings_click_outside_closes_or_returns() {
+        let mut app = create_test_app().await;
+
+        // 1. Root settings: clicking outside (0, 0) should close overlay
+        app.overlay = Some(Overlay::Settings);
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 0,
+            row: 0,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, None);
+
+        // 2. Playback settings: clicking outside should return to Settings
+        app.overlay = Some(Overlay::SettingsPlayback);
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 0,
+            row: 0,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::Settings));
+    }
+
+    #[tokio::test]
+    async fn test_settings_click_item_navigation_and_toggle() {
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::Settings);
+
+        // Click on item 4 (row 7 + 4 = 11): Playback Settings
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 11,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::SettingsPlayback));
+
+        // Click footer (row 23): should return to Settings
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 23,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.overlay, Some(Overlay::Settings));
+
+        // Click on item 1 (row 7 + 1 = 8): Transparent background toggle
+        let initial_transparent = app.config.transparent_background;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 20,
+            row: 8,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.config.transparent_background, !initial_transparent);
+    }
+
+    #[tokio::test]
+    async fn test_settings_scroll_wheel_navigation() {
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::Settings);
+        app.settings_selected = 0;
+
+        // ScrollDown should advance selection to 1
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: 20,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.settings_selected, 1);
+
+        // ScrollUp should wrap back to SETTINGS_ROOT_ITEMS - 1
+        app.settings_selected = 0;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollUp,
+            column: 20,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+        assert_eq!(app.settings_selected, SETTINGS_ROOT_ITEMS - 1);
+    }
 }

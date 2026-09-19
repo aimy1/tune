@@ -37,6 +37,11 @@ pub enum Action {
     ModalLeft,
     ModalRight,
 
+    SettingsClickItem { index: usize, is_right: bool },
+    BarSettingsClickItem { index: usize, is_right: bool },
+    DesktopLyricsSettingsClickItem { index: usize, is_right: bool },
+    HelpSelect(usize),
+
     PlaylistUp,
     PlaylistDown,
     PlaylistMoveItemUp,

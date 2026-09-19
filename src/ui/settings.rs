@@ -2,13 +2,13 @@ use crate::app::{App, Overlay};
 use crate::data::config::{AudioQuality, BarChannels, BarNumber, Language, VisualizeMode};
 
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
+pub fn draw_settings_modal(frame: &mut Frame, app: &mut App) {
     let size = frame.area();
 
     if matches!(app.overlay, Some(Overlay::SettingsAbout)) {
@@ -29,11 +29,24 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
         _ => l(app, " 设置 ", " Settings "),
     };
 
+    let close_btn = if matches!(app.overlay, Some(Overlay::Settings)) {
+        l(app, " [关闭 ×] ", " [Close ×] ")
+    } else {
+        l(app, " [返回 ‹] ", " [Back ‹] ")
+    };
+
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
             .title(title)
+            .title(
+                Line::from(Span::styled(
+                    close_btn,
+                    Style::default().fg(app.theme.color_subtext()),
+                ))
+                .alignment(Alignment::Right),
+            )
             .border_style(
                 Style::default()
                     .fg(app.theme.color_accent())
@@ -49,14 +62,14 @@ pub fn draw_settings_modal(frame: &mut Frame, app: &App) {
     });
 
     match app.overlay {
-        Some(Overlay::SettingsPlayback) => draw_playback_settings(frame, app, inner),
-        Some(Overlay::SettingsDesktopLyrics) => draw_desktop_lyrics_settings(frame, app, inner),
-        Some(Overlay::SettingsKeybinds) => draw_keybind_settings(frame, app, inner),
-        _ => draw_root_settings(frame, app, inner),
+        Some(Overlay::SettingsPlayback) => draw_playback_settings(frame, app, area, inner),
+        Some(Overlay::SettingsDesktopLyrics) => draw_desktop_lyrics_settings(frame, app, area, inner),
+        Some(Overlay::SettingsKeybinds) => draw_keybind_settings(frame, app, area, inner),
+        _ => draw_root_settings(frame, app, area, inner),
     }
 }
 
-fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
+fn draw_root_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -65,6 +78,29 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
             Constraint::Length(1),
         ])
         .split(inner);
+
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: Some(crate::app::HitRect {
+            x: rows[1].x,
+            y: rows[1].y,
+            width: rows[1].width,
+            height: rows[1].height,
+        }),
+        footer_area: Some(crate::app::HitRect {
+            x: rows[2].x,
+            y: rows[2].y,
+            width: rows[2].width,
+            height: rows[2].height,
+        }),
+        list_scroll: 0,
+        list_count: crate::app::SETTINGS_ROOT_ITEMS,
+    };
     frame.render_widget(
         Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
         rows[0],
@@ -158,7 +194,7 @@ fn draw_root_settings(frame: &mut Frame, app: &App, inner: Rect) {
     );
 }
 
-fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
+fn draw_playback_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -167,6 +203,29 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
             Constraint::Length(1),
         ])
         .split(inner);
+
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: Some(crate::app::HitRect {
+            x: rows[1].x,
+            y: rows[1].y,
+            width: rows[1].width,
+            height: rows[1].height,
+        }),
+        footer_area: Some(crate::app::HitRect {
+            x: rows[2].x,
+            y: rows[2].y,
+            width: rows[2].width,
+            height: rows[2].height,
+        }),
+        list_scroll: 0,
+        list_count: crate::app::SETTINGS_PLAYBACK_ITEMS,
+    };
     frame.render_widget(
         Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
         rows[0],
@@ -276,7 +335,7 @@ fn draw_playback_settings(frame: &mut Frame, app: &App, inner: Rect) {
     );
 }
 
-fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
+fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -285,6 +344,29 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
             Constraint::Length(1),
         ])
         .split(inner);
+
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: Some(crate::app::HitRect {
+            x: rows[1].x,
+            y: rows[1].y,
+            width: rows[1].width,
+            height: rows[1].height,
+        }),
+        footer_area: Some(crate::app::HitRect {
+            x: rows[2].x,
+            y: rows[2].y,
+            width: rows[2].width,
+            height: rows[2].height,
+        }),
+        list_scroll: 0,
+        list_count: crate::app::SETTINGS_DESKTOP_LYRICS_ITEMS,
+    };
     frame.render_widget(
         Paragraph::new("").style(Style::default().bg(app.theme.color_surface())),
         rows[0],
@@ -397,7 +479,7 @@ fn draw_desktop_lyrics_settings(frame: &mut Frame, app: &App, inner: Rect) {
     );
 }
 
-fn draw_keybind_settings(frame: &mut Frame, app: &App, inner: Rect) {
+fn draw_keybind_settings(frame: &mut Frame, app: &mut App, area: Rect, inner: Rect) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -493,6 +575,29 @@ fn draw_keybind_settings(frame: &mut Frame, app: &App, inner: Rect) {
         0
     } else {
         (focus_index + 1 - visible_rows).min(max_scroll)
+    };
+
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: Some(crate::app::HitRect {
+            x: rows[1].x,
+            y: rows[1].y,
+            width: rows[1].width,
+            height: rows[1].height,
+        }),
+        footer_area: Some(crate::app::HitRect {
+            x: rows[2].x,
+            y: rows[2].y,
+            width: rows[2].width,
+            height: rows[2].height,
+        }),
+        list_scroll: scroll,
+        list_count: total_rows,
     };
 
     frame.render_widget(

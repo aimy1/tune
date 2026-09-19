@@ -9,20 +9,44 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 /// Minimalist About modal: clean rounded border with no border text,
 /// centered TUNE logo, concise essential info, and soft exit hint.
-pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
+pub fn draw_about_modal(frame: &mut Frame, app: &mut App, size: Rect) {
     if size.width < 32 || size.height < 10 {
         draw_compact(frame, app, size);
         return;
     }
 
     let area = modal_area(size);
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: None,
+        footer_area: None,
+        list_scroll: 0,
+        list_count: 0,
+    };
     frame.render_widget(Clear, area);
 
-    // Clean border with NO text on borders
+    let back_btn = if app.config.language == Language::Zh {
+        " [返回 ‹] "
+    } else {
+        " [Back ‹] "
+    };
+
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
+            .title(
+                Line::from(Span::styled(
+                    back_btn,
+                    Style::default().fg(app.theme.color_subtext()),
+                ))
+                .alignment(Alignment::Right),
+            )
             .border_style(
                 Style::default()
                     .fg(app.theme.color_accent())
@@ -39,19 +63,43 @@ pub fn draw_about_modal(frame: &mut Frame, app: &App, size: Rect) {
     draw_about_content(frame, app, inner);
 }
 
-fn draw_compact(frame: &mut Frame, app: &App, size: Rect) {
+fn draw_compact(frame: &mut Frame, app: &mut App, size: Rect) {
     let area = centered_rect(
         size.width.saturating_sub(2).max(20),
         size.height.saturating_sub(2).max(8),
         size,
     );
+    app.settings_modal_hits = crate::app::SettingsModalHits {
+        modal_area: Some(crate::app::HitRect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height,
+        }),
+        list_area: None,
+        footer_area: None,
+        list_scroll: 0,
+        list_count: 0,
+    };
     frame.render_widget(Clear, area);
 
-    // Clean border with NO text on borders
+    let back_btn = if app.config.language == Language::Zh {
+        " [返回 ‹] "
+    } else {
+        " [Back ‹] "
+    };
+
     frame.render_widget(
         Block::default()
             .borders(Borders::ALL)
             .border_type(ratatui::widgets::BorderType::Rounded)
+            .title(
+                Line::from(Span::styled(
+                    back_btn,
+                    Style::default().fg(app.theme.color_subtext()),
+                ))
+                .alignment(Alignment::Right),
+            )
             .border_style(
                 Style::default()
                     .fg(app.theme.color_accent())
@@ -164,7 +212,7 @@ fn surface_style(app: &App) -> Style {
         .bg(app.theme.color_surface())
 }
 
-fn modal_area(size: Rect) -> Rect {
+pub(crate) fn modal_area(size: Rect) -> Rect {
     let want_w = 58u16;
     let want_h = 16u16;
 

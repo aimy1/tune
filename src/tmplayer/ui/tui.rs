@@ -381,6 +381,13 @@ fn render_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState)
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 设置 ", " Settings "))
+        .title(
+            Line::from(Span::styled(
+                lang_text(app, " [关闭 ×] ", " [Close ×] "),
+                Style::default().fg(app.theme.color_subtext()),
+            ))
+            .alignment(ratatui::layout::Alignment::Right),
+        )
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
@@ -556,6 +563,13 @@ fn render_bar_settings_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppSt
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
         .title(lang_text(app, " 播放设置 ", " Playback Settings "))
+        .title(
+            Line::from(Span::styled(
+                lang_text(app, " [返回 ‹] ", " [Back ‹] "),
+                Style::default().fg(app.theme.color_subtext()),
+            ))
+            .alignment(ratatui::layout::Alignment::Right),
+        )
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
@@ -739,6 +753,13 @@ fn render_desktop_lyrics_settings_modal(f: &mut ratatui::Frame, size: Rect, app:
         .borders(Borders::ALL)
         .border_type(ratatui::widgets::BorderType::Rounded)
         .title(title)
+        .title(
+            Line::from(Span::styled(
+                lang_text(app, " [返回 ‹] ", " [Back ‹] "),
+                Style::default().fg(app.theme.color_subtext()),
+            ))
+            .alignment(ratatui::layout::Alignment::Right),
+        )
         .border_style(
             Style::default()
                 .fg(app.theme.color_accent())
@@ -1916,6 +1937,135 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
                 });
             }
         }
+    }
+
+    if app.overlay == Overlay::SettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if !contains(area, col, row) || row == area.y {
+            return Some(Action::ExitSettings);
+        }
+        let inner = area.inner(ratatui::layout::Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        if contains(rows[2], col, row) {
+            return Some(Action::ExitSettings);
+        }
+        if contains(rows[1], col, row) {
+            let idx = (row.saturating_sub(rows[1].y)) as usize;
+            if idx < 11 {
+                return Some(Action::SettingsClickItem {
+                    index: idx,
+                    is_right: col >= inner.x + inner.width / 2,
+                });
+            }
+        }
+        return None;
+    }
+
+    if app.overlay == Overlay::BarSettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if !contains(area, col, row) || row == area.y {
+            return Some(Action::CloseOverlay);
+        }
+        let inner = area.inner(ratatui::layout::Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        if contains(rows[2], col, row) {
+            return Some(Action::CloseOverlay);
+        }
+        if contains(rows[1], col, row) {
+            let idx = (row.saturating_sub(rows[1].y)) as usize;
+            if idx < 10 {
+                return Some(Action::BarSettingsClickItem {
+                    index: idx,
+                    is_right: col >= inner.x + inner.width / 2,
+                });
+            }
+        }
+        return None;
+    }
+
+    if app.overlay == Overlay::DesktopLyricsSettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if !contains(area, col, row) || row == area.y {
+            return Some(Action::CloseOverlay);
+        }
+        let inner = area.inner(ratatui::layout::Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        if contains(rows[2], col, row) {
+            return Some(Action::CloseOverlay);
+        }
+        if contains(rows[1], col, row) {
+            let idx = (row.saturating_sub(rows[1].y)) as usize;
+            if idx < 9 {
+                return Some(Action::DesktopLyricsSettingsClickItem {
+                    index: idx,
+                    is_right: col >= inner.x + inner.width / 2,
+                });
+            }
+        }
+        return None;
+    }
+
+    if app.overlay == Overlay::AboutModal {
+        return Some(Action::CloseOverlay);
+    }
+
+    if app.overlay == Overlay::HelpModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if !contains(area, col, row) || row == area.y {
+            return Some(Action::CloseOverlay);
+        }
+        let inner = area.inner(ratatui::layout::Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
+        let rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Min(1),
+                Constraint::Length(1),
+            ])
+            .split(inner);
+        if contains(rows[2], col, row) {
+            return Some(Action::CloseOverlay);
+        }
+        if contains(rows[1], col, row) {
+            let idx = (row.saturating_sub(rows[1].y)) as usize;
+            if idx < 17 {
+                return Some(Action::HelpSelect(idx));
+            }
+        }
+        return None;
     }
 
     if contains(layout.info_controls, col, row) {
