@@ -687,17 +687,26 @@ pub async fn run(
         while event::poll(Duration::from_millis(0))? {
             match event::read()? {
                 Event::Key(k) => {
-                    let action = map_key(k, app.overlay, &app.config);
-                    handle_action(
-                        app,
-                        &mut mode_manager,
-                        system_volume.as_ref(),
-                        &mut host_bridge,
-                        action,
-                        &last_layout,
-                    )
-                    .await?;
-                    state_changed = true;
+                    if k.kind == crossterm::event::KeyEventKind::Press
+                        && k.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                        && matches!(k.code, crossterm::event::KeyCode::Char('l') | crossterm::event::KeyCode::Char('L'))
+                    {
+                        let _ = tui.clear();
+                        tui.on_resize();
+                        state_changed = true;
+                    } else {
+                        let action = map_key(k, app.overlay, &app.config);
+                        handle_action(
+                            app,
+                            &mut mode_manager,
+                            system_volume.as_ref(),
+                            &mut host_bridge,
+                            action,
+                            &last_layout,
+                        )
+                        .await?;
+                        state_changed = true;
+                    }
                 }
                 Event::Mouse(m) => {
                     let action = map_mouse(m);

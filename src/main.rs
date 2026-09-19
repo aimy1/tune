@@ -174,6 +174,7 @@ impl tmplayer::HostPlaybackBridge for AppFullscreenBridge<'_> {
 #[tokio::main]
 async fn main() -> Result<()> {
     install_panic_hook();
+    crate::tmplayer::utils::stderr_filter::install_alsa_stderr_filter();
     ring::default_provider().install_default().unwrap();
     let config = Config::load_or_default()?;
     let theme = ThemeLoader::load_with_overrides(&config.theme, config.palette.as_ref())
@@ -275,14 +276,23 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Ap
         if event::poll(wait_timeout)? {
             match event::read()? {
                 Event::Key(key) => {
-                    app.handle_key(key).await;
-                    needs_redraw = true;
+                    if key.kind == crossterm::event::KeyEventKind::Press
+                        && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                        && matches!(key.code, crossterm::event::KeyCode::Char('l') | crossterm::event::KeyCode::Char('L'))
+                    {
+                        let _ = terminal.clear();
+                        needs_redraw = true;
+                    } else {
+                        app.handle_key(key).await;
+                        needs_redraw = true;
+                    }
                 }
                 Event::Mouse(mouse) => {
                     app.handle_mouse(mouse).await;
                     needs_redraw = true;
                 }
                 Event::Resize(_, _) => {
+                    let _ = terminal.clear();
                     needs_redraw = true;
                 }
                 _ => {}

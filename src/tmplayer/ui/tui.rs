@@ -78,9 +78,16 @@ impl Tui {
         Ok(())
     }
 
+    pub fn clear(&mut self) -> Result<()> {
+        self.terminal.clear()?;
+        Ok(())
+    }
+
     /// Terminal resize can clear/lose kitty graphic placements. Mark placements dirty so
     /// the next draw will re-place images.
-    pub fn on_resize(&mut self) {}
+    pub fn on_resize(&mut self) {
+        let _ = self.terminal.clear();
+    }
 
     pub fn draw(&mut self, app: &mut AppState) -> Result<UiLayout> {
         if app.toast.as_ref().map(|(m, _)| m.as_str()) == Some("Bye") {

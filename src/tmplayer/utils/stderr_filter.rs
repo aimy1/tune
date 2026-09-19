@@ -49,12 +49,23 @@ pub fn install_alsa_stderr_filter() {
 
         // Close the extra write end; stderr now points to the pipe.
         let _ = libc::close(write_fd);
+        let _ = libc::close(orig_fd);
 
-        // Move fds into Rust std types.
+        // Move read_fd into Rust File.
         let reader_file = File::from_raw_fd(read_fd);
-        let mut orig_file = File::from_raw_fd(orig_fd);
+
+        let log_file = directories::BaseDirs::new().and_then(|d| {
+            let log_dir = d.cache_dir().join("tune");
+            let _ = std::fs::create_dir_all(&log_dir);
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("tune_stderr.log"))
+                .ok()
+        });
 
         thread::spawn(move || {
+            let mut log_file = log_file;
             let mut reader = BufReader::new(reader_file);
             let mut line = String::new();
             loop {
@@ -65,8 +76,10 @@ pub fn install_alsa_stderr_filter() {
                         if should_drop_stderr_line(&line) {
                             continue;
                         }
-                        let _ = orig_file.write_all(line.as_bytes());
-                        let _ = orig_file.flush();
+                        if let Some(f) = log_file.as_mut() {
+                            let _ = f.write_all(line.as_bytes());
+                            let _ = f.flush();
+                        }
                     }
                     Err(_) => break,
                 }
@@ -74,7 +87,6 @@ pub fn install_alsa_stderr_filter() {
         });
 
         // Prevent accidental close of the now-redirected stderr by any File drop.
-        // (stderr is managed by the OS; we only own orig_file in the thread.)
         let _ = File::from_raw_fd(libc::STDERR_FILENO).into_raw_fd();
     });
 }
