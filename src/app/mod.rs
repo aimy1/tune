@@ -237,6 +237,7 @@ pub struct CoverFetchState {
     ascii: Option<AsciiFuture>,
     size: Size,
     protocol: Option<Arc<Mutex<StatefulProtocol>>>,
+    protocol_type: Option<ratatui_image::picker::ProtocolType>,
 }
 
 impl CoverFetchState {
@@ -255,6 +256,7 @@ impl CoverFetchState {
         self.url = Some(url);
         self.size = Size::ZERO;
         self.protocol = None;
+        self.protocol_type = None;
     }
 
     pub fn render(
@@ -288,12 +290,17 @@ impl CoverFetchState {
             let Some(img) = peek_shared_future(&self.image) else {
                 return;
             };
-            if self.protocol.is_none() || self.size != area.as_size() {
+            let current_proto_type = picker.protocol_type();
+            if self.protocol.is_none()
+                || self.size != area.as_size()
+                || self.protocol_type != Some(current_proto_type)
+            {
                 let (img_w, img_h) = img.dimensions();
                 let (x, y, w, h) = cover_viewport(img_w, img_h, w, h);
                 let img = img.crop_imm(x, y, w, h);
                 self.protocol = Some(Arc::new(Mutex::new(picker.new_resize_protocol(img))));
                 self.size = area.as_size();
+                self.protocol_type = Some(current_proto_type);
             }
             if let Some(proto) = &self.protocol {
                 let mut proto = proto.lock().unwrap();
@@ -1697,6 +1704,14 @@ impl App {
         self.config.graphics_protocol == GraphicsProtocol::Off
     }
 
+    pub fn update_graphics_protocol(&mut self, next: GraphicsProtocol) {
+        if self.config.graphics_protocol != next {
+            self.config.graphics_protocol = next;
+            self.graphics_picker = crate::data::config::resolve_picker(next);
+            let _ = self.config.save();
+        }
+    }
+
     pub async fn new(config: Config, theme: Theme) -> Result<Self> {
         let saved_cookie = session::load_cookie().ok().flatten();
         let system_volume = crate::tmplayer::utils::system_volume::SystemVolume::try_new().ok();
@@ -1745,6 +1760,8 @@ impl App {
         let theme_file_mtime = std::fs::metadata(&ThemeLoader::resolve_theme_path(&config.theme))
             .and_then(|m| m.modified())
             .ok();
+
+        let graphics_picker = crate::data::config::resolve_picker(config.graphics_protocol);
 
         let mut app = Self {
             config,
@@ -1818,21 +1835,11 @@ impl App {
             volume,
             pre_mute_volume: None,
             system_volume,
-            graphics_picker: Picker::halfblocks(),
+            graphics_picker,
             desktop_lyrics_manager,
             theme_file_mtime,
             theme_check_ticks: 0,
         };
-
-        if Picker::from_query_stdio().is_ok() {
-            // Don't use queried picker, this cause image layouted improperly on konsole.
-            // It's ok to not set this if we just use Halfblocks.
-
-            // app.graphics_picker = picker;
-        }
-        if let Some(protocol) = app.config.graphics_protocol.to_ratatui_protocol() {
-            app.graphics_picker.set_protocol_type(protocol);
-        }
 
         app.ensure_main_cava();
 
@@ -4656,8 +4663,7 @@ impl App {
                 if delta != 0 {
                     let next_protocol = self.config.graphics_protocol.cycle(delta);
                     if next_protocol != self.config.graphics_protocol {
-                        self.config.graphics_protocol = next_protocol;
-                        let _ = self.config.save();
+                        self.update_graphics_protocol(next_protocol);
                     }
                 }
             }
@@ -5414,7 +5420,7 @@ impl App {
         }
 
         if self.config.graphics_protocol != sync.graphics_protocol {
-            self.config.graphics_protocol = sync.graphics_protocol;
+            self.update_graphics_protocol(sync.graphics_protocol);
             changed = true;
         }
 

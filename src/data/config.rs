@@ -9,25 +9,42 @@ const DEFAULT_EQ_BANDS_DB: [f32; crate::tmplayer::app::state::EQ_BANDS] =
 const LEGACY_STARTUP_FOLDER_KEY: &str = concat!("default", "_opening", "_folder");
 const LEGACY_STARTUP_FOLDER_KEY_KEBAB: &str = concat!("default", "-opening", "-folder");
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GraphicsProtocol {
-    Off,
     #[default]
-    #[serde(alias = "auto")]
-    #[serde(alias = "sixel")]
-    #[serde(alias = "kitty")]
-    #[serde(alias = "iterm2")]
+    #[serde(alias = "Auto")]
+    Auto,
+    #[serde(alias = "Kitty")]
+    Kitty,
+    #[serde(alias = "Sixel")]
+    Sixel,
+    #[serde(alias = "iterm2", alias = "iTerm2", alias = "Iterm2")]
+    Iterm2,
+    #[serde(alias = "Halfblocks", alias = "halfblocks")]
     Halfblocks,
+    #[serde(alias = "Off")]
+    Off,
 }
 
 impl GraphicsProtocol {
-    const ALL: [Self; 2] = [Self::Off, Self::Halfblocks];
+    pub const ALL: [Self; 6] = [
+        Self::Auto,
+        Self::Kitty,
+        Self::Sixel,
+        Self::Iterm2,
+        Self::Halfblocks,
+        Self::Off,
+    ];
 
     pub fn to_ratatui_protocol(self) -> Option<ratatui_image::picker::ProtocolType> {
         match self {
-            GraphicsProtocol::Off => None,
+            GraphicsProtocol::Auto => None,
+            GraphicsProtocol::Kitty => Some(ratatui_image::picker::ProtocolType::Kitty),
+            GraphicsProtocol::Sixel => Some(ratatui_image::picker::ProtocolType::Sixel),
+            GraphicsProtocol::Iterm2 => Some(ratatui_image::picker::ProtocolType::Iterm2),
             GraphicsProtocol::Halfblocks => Some(ratatui_image::picker::ProtocolType::Halfblocks),
+            GraphicsProtocol::Off => None,
         }
     }
 
@@ -37,8 +54,12 @@ impl GraphicsProtocol {
         }
 
         let current = match self {
-            GraphicsProtocol::Off => 0,
-            GraphicsProtocol::Halfblocks => 1,
+            Self::Auto => 0,
+            Self::Kitty => 1,
+            Self::Sixel => 2,
+            Self::Iterm2 => 3,
+            Self::Halfblocks => 4,
+            Self::Off => 5,
         };
         let next = (current + delta).rem_euclid(Self::ALL.len() as i32) as usize;
         Self::ALL[next]
@@ -46,10 +67,60 @@ impl GraphicsProtocol {
 
     pub fn display_name(self) -> &'static str {
         match self {
-            GraphicsProtocol::Off => "off",
-            GraphicsProtocol::Halfblocks => "Halfblocks",
+            Self::Auto => "Auto",
+            Self::Kitty => "Kitty",
+            Self::Sixel => "Sixel",
+            Self::Iterm2 => "iTerm2",
+            Self::Halfblocks => "Halfblocks",
+            Self::Off => "Off",
         }
     }
+}
+
+pub fn resolve_picker(protocol: GraphicsProtocol) -> ratatui_image::picker::Picker {
+    match protocol {
+        GraphicsProtocol::Off => ratatui_image::picker::Picker::halfblocks(),
+        GraphicsProtocol::Halfblocks => ratatui_image::picker::Picker::halfblocks(),
+        GraphicsProtocol::Auto => {
+            if is_kitty_terminal() {
+                let mut p = ratatui_image::picker::Picker::from_query_stdio()
+                    .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks());
+                p.set_protocol_type(ratatui_image::picker::ProtocolType::Kitty);
+                return p;
+            }
+            if is_sixel_terminal() {
+                let mut p = ratatui_image::picker::Picker::from_query_stdio()
+                    .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks());
+                p.set_protocol_type(ratatui_image::picker::ProtocolType::Sixel);
+                return p;
+            }
+            ratatui_image::picker::Picker::from_query_stdio()
+                .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks())
+        }
+        specific => {
+            let mut p = ratatui_image::picker::Picker::from_query_stdio()
+                .unwrap_or_else(|_| ratatui_image::picker::Picker::halfblocks());
+            if let Some(proto) = specific.to_ratatui_protocol() {
+                p.set_protocol_type(proto);
+            }
+            p
+        }
+    }
+}
+
+fn is_kitty_terminal() -> bool {
+    std::env::var("KITTY_PID").is_ok()
+        || std::env::var("KITTY_WINDOW_ID").is_ok()
+        || std::env::var("GHOSTTY_RESOURCES_DIR").is_ok()
+        || std::env::var("TERM")
+            .map(|t| t == "xterm-kitty" || t == "xterm-ghostty")
+            .unwrap_or(false)
+}
+
+fn is_sixel_terminal() -> bool {
+    std::env::var("TERM")
+        .map(|t| t == "foot" || t == "foot-extra")
+        .unwrap_or(false)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -959,7 +1030,10 @@ fn graphics_protocol_needs_save(raw: &str) -> bool {
         return true;
     };
 
-    matches!(value, "auto" | "sixel" | "kitty" | "iterm2")
+    !matches!(
+        value.to_ascii_lowercase().as_str(),
+        "auto" | "kitty" | "sixel" | "iterm2" | "halfblocks" | "off"
+    )
 }
 
 #[cfg(test)]
@@ -977,10 +1051,10 @@ mod tests {
         let cases = [
             ("off", GraphicsProtocol::Off),
             ("halfblocks", GraphicsProtocol::Halfblocks),
-            ("auto", GraphicsProtocol::Halfblocks),
-            ("sixel", GraphicsProtocol::Halfblocks),
-            ("kitty", GraphicsProtocol::Halfblocks),
-            ("iterm2", GraphicsProtocol::Halfblocks),
+            ("auto", GraphicsProtocol::Auto),
+            ("sixel", GraphicsProtocol::Sixel),
+            ("kitty", GraphicsProtocol::Kitty),
+            ("iterm2", GraphicsProtocol::Iterm2),
         ];
 
         for (raw, expected) in cases {
@@ -988,6 +1062,24 @@ mod tests {
                 toml::from_str(&format!("protocol = \"{}\"", raw)).unwrap();
             assert_eq!(parsed.protocol, expected);
         }
+    }
+
+    #[test]
+    fn test_graphics_protocol_cycling_and_display() {
+        assert_eq!(GraphicsProtocol::Auto.display_name(), "Auto");
+        assert_eq!(GraphicsProtocol::Kitty.display_name(), "Kitty");
+        assert_eq!(GraphicsProtocol::Sixel.display_name(), "Sixel");
+        assert_eq!(GraphicsProtocol::Iterm2.display_name(), "iTerm2");
+        assert_eq!(GraphicsProtocol::Halfblocks.display_name(), "Halfblocks");
+        assert_eq!(GraphicsProtocol::Off.display_name(), "Off");
+
+        assert_eq!(GraphicsProtocol::Auto.cycle(1), GraphicsProtocol::Kitty);
+        assert_eq!(GraphicsProtocol::Kitty.cycle(1), GraphicsProtocol::Sixel);
+        assert_eq!(GraphicsProtocol::Sixel.cycle(1), GraphicsProtocol::Iterm2);
+        assert_eq!(GraphicsProtocol::Iterm2.cycle(1), GraphicsProtocol::Halfblocks);
+        assert_eq!(GraphicsProtocol::Halfblocks.cycle(1), GraphicsProtocol::Off);
+        assert_eq!(GraphicsProtocol::Off.cycle(1), GraphicsProtocol::Auto);
+        assert_eq!(GraphicsProtocol::Auto.cycle(-1), GraphicsProtocol::Off);
     }
 
     #[test]

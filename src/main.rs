@@ -187,6 +187,7 @@ async fn main() -> Result<()> {
     let mut app = App::new(config, theme).await?;
 
     let mut terminal = init_terminal()?;
+    app.graphics_picker = crate::data::config::resolve_picker(app.config.graphics_protocol);
     let run_result = run_app(&mut terminal, &mut app).await;
     restore_terminal(&mut terminal)?;
     run_result
@@ -233,6 +234,7 @@ async fn run_app(terminal: &mut Terminal<CrosstermBackend<Stdout>>, app: &mut Ap
 
         if app.config.graphics_protocol != active_graphics_protocol {
             active_graphics_protocol = app.config.graphics_protocol;
+            app.graphics_picker = crate::data::config::resolve_picker(app.config.graphics_protocol);
             needs_redraw = true;
         }
 

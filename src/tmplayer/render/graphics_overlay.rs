@@ -35,6 +35,7 @@ pub enum TmCoverSlot {
 
 pub struct GraphicsOverlay {
     picker: Picker,
+    last_protocol: GraphicsProtocol,
     last_term_size: Option<(u16, u16)>,
     last_content_hash: Option<u64>,
     segment_protocols: HashMap<SegmentKey, StatefulProtocol>,
@@ -42,12 +43,10 @@ pub struct GraphicsOverlay {
 
 impl GraphicsOverlay {
     pub fn new(graphics_protocol: GraphicsProtocol) -> Self {
-        let mut picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
-        if let Some(proto) = graphics_protocol.to_ratatui_protocol() {
-            picker.set_protocol_type(proto);
-        }
+        let picker = crate::data::config::resolve_picker(graphics_protocol);
         Self {
             picker,
+            last_protocol: graphics_protocol,
             last_term_size: None,
             last_content_hash: None,
             segment_protocols: HashMap::new(),
@@ -66,6 +65,12 @@ impl GraphicsOverlay {
         if app.config.graphics_protocol == GraphicsProtocol::Off {
             self.clear_all();
             return;
+        }
+
+        if self.last_protocol != app.config.graphics_protocol {
+            self.last_protocol = app.config.graphics_protocol;
+            self.picker = crate::data::config::resolve_picker(app.config.graphics_protocol);
+            self.clear_all();
         }
 
         let size = frame.area();
