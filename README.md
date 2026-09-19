@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/aimy1/tune/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License MIT" /></a>
-  <a href="https://github.com/aimy1/tune/releases"><img src="https://img.shields.io/badge/Release-v0.6.0-success.svg?style=flat-square" alt="Release v0.6.0" /></a>
+  <a href="https://github.com/aimy1/tune/releases"><img src="https://img.shields.io/badge/Release-v0.7.0-success.svg?style=flat-square" alt="Release v0.7.0" /></a>
   <img src="https://img.shields.io/badge/Rust-2024%20Edition-orange.svg?style=flat-square" alt="Rust Edition" />
   <img src="https://img.shields.io/badge/Platform-Linux-lightgrey.svg?style=flat-square" alt="Platform Linux" />
   <img src="https://img.shields.io/badge/Ratatui-v0.30-red.svg?style=flat-square" alt="Ratatui Version" />
