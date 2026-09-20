@@ -35,7 +35,7 @@
 
 
 <div align="center">
-  <img src="assets/demo.gif" alt="Tune 播放与桌面歌词功能演示" width="100%" />
+  <img src="assets/demo_preview.gif" alt="Tune 播放与桌面歌词功能演示" width="100%" />
 </div>
 
 ---
