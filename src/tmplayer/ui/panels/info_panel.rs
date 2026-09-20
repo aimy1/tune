@@ -27,7 +27,7 @@ pub struct InfoPanelLayout {
     pub time_line: Rect,
 }
 
-pub fn layout(area: Rect) -> InfoPanelLayout {
+pub fn layout(area: Rect, album_border: bool) -> InfoPanelLayout {
     // Keep borders outside and reserve an inner content area.
     let inner = area.inner(ratatui::layout::Margin {
         horizontal: 2,
@@ -47,19 +47,36 @@ pub fn layout(area: Rect) -> InfoPanelLayout {
 
     // Remaining height is for cover + an optional gap below cover.
     let used_without_cover = CORE_H.saturating_add(time_h);
-    let mut cover_h = inner.height.saturating_sub(used_without_cover);
-    let use_cover_gap = cover_h > 1;
+    let mut avail_h = inner.height.saturating_sub(used_without_cover);
+    let use_cover_gap = avail_h > 1;
     if use_cover_gap {
-        cover_h = cover_h.saturating_sub(1);
+        avail_h = avail_h.saturating_sub(1);
     }
 
-    // Cover should shrink first. Clamp by panel width and keep as low as 0 for tiny windows.
-    let max_cover_h_by_width = inner.width / 2;
-    cover_h = cover_h.min(max_cover_h_by_width);
-    let cover_w = if cover_h == 0 {
-        0
+    // Visual square: terminal cell aspect ratio is typically 1:2 (width:height).
+    // An inner image area of (side * 2) cols x side rows yields a visual 1:1 square.
+    // When album_border is true, the border consumes 2 cols and 2 rows, so:
+    //   cover_w = side * 2 + 2, cover_h = side + 2 -> inner = (side * 2) x side (exact 2:1).
+    // When album_border is false:
+    //   cover_w = side * 2, cover_h = side -> inner = (side * 2) x side (exact 2:1).
+    let (cover_w, cover_h) = if album_border {
+        let max_side_by_h = avail_h.saturating_sub(2);
+        let max_side_by_w = inner.width.saturating_sub(2) / 2;
+        let side = max_side_by_h.min(max_side_by_w);
+        if side == 0 {
+            (0, 0)
+        } else {
+            (side * 2 + 2, side + 2)
+        }
     } else {
-        (cover_h.saturating_mul(2)).min(inner.width)
+        let max_side_by_h = avail_h;
+        let max_side_by_w = inner.width / 2;
+        let side = max_side_by_h.min(max_side_by_w);
+        if side == 0 {
+            (0, 0)
+        } else {
+            (side * 2, side)
+        }
     };
 
     let stack_h = cover_h
@@ -152,11 +169,11 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
         .style(b_style);
     f.render_widget(b, area);
 
-    let l = layout(area);
+    let l = layout(area, app.config.album_border);
 
     // cover (animated as a whole: content + border)
     if l.cover.width > 0 && l.cover.height > 0 {
-        let show_border = app.config.album_border;
+        let show_border = app.config.album_border && l.cover.width >= 4 && l.cover.height >= 3;
 
         let kitty_enabled = app.config.graphics_protocol != GraphicsProtocol::Off
             && app.player.track.cover.is_some();
@@ -178,88 +195,35 @@ pub fn render(f: &mut Frame, area: Rect, app: &mut AppState) {
             app.overlay == Overlay::Playlist || app.playlist_slide_x != app.playlist_slide_target_x;
 
         if kitty_enabled {
-            if playlist_overlay_visible {
-                // Pure color placeholder (keep border option).
-                let bg = dominant_bg;
-                if show_border {
-                    let block = Block::default()
-                        .borders(Borders::ALL)
-                        .border_set(SOLID_BORDER)
-                        .style(Style::default().fg(app.theme.color_subtext()));
-                    f.render_widget(block, l.cover);
-                    let inner = l.cover.inner(ratatui::layout::Margin {
-                        horizontal: 1,
-                        vertical: 1,
-                    });
-                    if inner.width > 0 && inner.height > 0 {
-                        f.render_widget(Block::default().style(Style::default().bg(bg)), inner);
-                    }
-                } else {
-                    let inner = l.cover.inner(ratatui::layout::Margin {
-                        horizontal: 1,
-                        vertical: 1,
-                    });
-                    if inner.width > 0 && inner.height > 0 {
-                        f.render_widget(Block::default().style(Style::default().bg(bg)), inner);
-                    }
-                }
-
-                // Pre-warm the ASCII cover cache while hidden so closing playlist is instant.
-                let snap = CoverSnapshot::from(&app.player.track);
-                let (inner_w, inner_h) = if l.cover.width >= 3 && l.cover.height >= 3 {
-                    (
-                        l.cover.width.saturating_sub(2),
-                        l.cover.height.saturating_sub(2),
-                    )
-                } else {
-                    (l.cover.width, l.cover.height)
-                };
-                let _ = cover_ascii_for_snapshot(&snap, inner_w, inner_h, app);
+            let inner = if show_border {
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_set(SOLID_BORDER)
+                    .style(Style::default().fg(app.theme.color_subtext()));
+                f.render_widget(block, l.cover);
+                l.cover.inner(ratatui::layout::Margin {
+                    horizontal: 1,
+                    vertical: 1,
+                })
             } else {
-                // Draw border (optional) and keep the inside blank; the real image is painted
-                // after ratatui draw via kitty graphics protocol.
-                if show_border {
-                    let block = Block::default()
-                        .borders(Borders::ALL)
-                        .border_set(SOLID_BORDER)
-                        .style(Style::default().fg(app.theme.color_subtext()));
-                    f.render_widget(block, l.cover);
-                    let inner = l.cover.inner(ratatui::layout::Margin {
-                        horizontal: 1,
-                        vertical: 1,
-                    });
-                    if inner.width > 0 && inner.height > 0 {
-                        f.render_widget(
-                            Paragraph::new(" ").style(Style::default().bg(dominant_bg)),
-                            inner,
-                        );
-                    }
-                } else {
-                    let inner = l.cover.inner(ratatui::layout::Margin {
-                        horizontal: 1,
-                        vertical: 1,
-                    });
-                    if inner.width > 0 && inner.height > 0 {
-                        f.render_widget(
-                            Paragraph::new(" ").style(Style::default().bg(dominant_bg)),
-                            inner,
-                        );
-                    }
-                }
+                l.cover
+            };
 
-                // Hot-switch support: while kitty is on, pre-warm the ASCII cover in the background
-                // (or load it from .order.toml) so turning kitty off in Settings is instant.
-                let snap = CoverSnapshot::from(&app.player.track);
-                let (inner_w, inner_h) = if l.cover.width >= 3 && l.cover.height >= 3 {
-                    (
-                        l.cover.width.saturating_sub(2),
-                        l.cover.height.saturating_sub(2),
-                    )
+            if inner.width > 0 && inner.height > 0 {
+                if playlist_overlay_visible {
+                    f.render_widget(Block::default().style(Style::default().bg(dominant_bg)), inner);
                 } else {
-                    (l.cover.width, l.cover.height)
-                };
-                let _ = cover_ascii_for_snapshot(&snap, inner_w, inner_h, app);
+                    f.render_widget(
+                        Paragraph::new(" ").style(Style::default().bg(dominant_bg)),
+                        inner,
+                    );
+                }
             }
+
+            // Pre-warm the ASCII cover cache while hidden / in background so closing playlist
+            // or switching graphics protocol off is instant.
+            let snap = CoverSnapshot::from(&app.player.track);
+            let _ = cover_ascii_for_snapshot(&snap, inner.width, inner.height, app);
         } else {
             // ASCII mode: do not actively hide the song cover when playlist opens.
             // The playlist overlay is rendered later and naturally covers it.
@@ -434,36 +398,33 @@ fn cover_box_ascii_for_snapshot(
 
     let mut grid: Vec<Vec<char>> = vec![vec![' '; width as usize]; height as usize];
 
-    let (inner_x, inner_y, inner_w, inner_h) = if width >= 3 && height >= 3 {
-        if show_border {
-            // Border
-            let tl = SOLID_BORDER.top_left.chars().next().unwrap_or(' ');
-            let tr = SOLID_BORDER.top_right.chars().next().unwrap_or(' ');
-            let bl = SOLID_BORDER.bottom_left.chars().next().unwrap_or(' ');
-            let br = SOLID_BORDER.bottom_right.chars().next().unwrap_or(' ');
-            let hch = SOLID_BORDER.horizontal_top.chars().next().unwrap_or(' ');
-            let vl = SOLID_BORDER.vertical_left.chars().next().unwrap_or(' ');
-            let vr = SOLID_BORDER.vertical_right.chars().next().unwrap_or(' ');
+    let (inner_x, inner_y, inner_w, inner_h) = if show_border && width >= 3 && height >= 3 {
+        // Border
+        let tl = SOLID_BORDER.top_left.chars().next().unwrap_or(' ');
+        let tr = SOLID_BORDER.top_right.chars().next().unwrap_or(' ');
+        let bl = SOLID_BORDER.bottom_left.chars().next().unwrap_or(' ');
+        let br = SOLID_BORDER.bottom_right.chars().next().unwrap_or(' ');
+        let hch = SOLID_BORDER.horizontal_top.chars().next().unwrap_or(' ');
+        let vl = SOLID_BORDER.vertical_left.chars().next().unwrap_or(' ');
+        let vr = SOLID_BORDER.vertical_right.chars().next().unwrap_or(' ');
 
-            grid[0][0] = tl;
-            grid[0][(width - 1) as usize] = tr;
-            grid[(height - 1) as usize][0] = bl;
-            grid[(height - 1) as usize][(width - 1) as usize] = br;
+        grid[0][0] = tl;
+        grid[0][(width - 1) as usize] = tr;
+        grid[(height - 1) as usize][0] = bl;
+        grid[(height - 1) as usize][(width - 1) as usize] = br;
 
-            for x in 1..(width - 1) {
-                grid[0][x as usize] = hch;
-                grid[(height - 1) as usize][x as usize] = hch;
-            }
-            for y in 1..(height - 1) {
-                grid[y as usize][0] = vl;
-                grid[y as usize][(width - 1) as usize] = vr;
-            }
+        for x in 1..(width - 1) {
+            grid[0][x as usize] = hch;
+            grid[(height - 1) as usize][x as usize] = hch;
+        }
+        for y in 1..(height - 1) {
+            grid[y as usize][0] = vl;
+            grid[y as usize][(width - 1) as usize] = vr;
         }
 
-        // Always reserve the same inner content area, even when border is hidden.
         (1usize, 1usize, (width - 2) as usize, (height - 2) as usize)
     } else {
-        // Too small to reserve padding; render full area.
+        // Border disabled or too small to reserve padding; render full area.
         (0usize, 0usize, width as usize, height as usize)
     };
 
@@ -729,7 +690,7 @@ mod tests {
     #[test]
     fn test_info_panel_volume_button_layout() {
         let area = Rect { x: 0, y: 0, width: 40, height: 20 };
-        let l = layout(area);
+        let l = layout(area, true);
         assert_eq!(l.volume.height, 1);
         assert!(l.volume.width > 0);
         assert_eq!(l.volume_label.height, 0);
@@ -738,11 +699,44 @@ mod tests {
     #[test]
     fn test_info_panel_heart_layout() {
         let area = Rect { x: 0, y: 0, width: 40, height: 20 };
-        let l = layout(area);
+        let l = layout(area, true);
         assert_eq!(l.heart.height, 1);
         assert_eq!(l.heart.y, l.meta.y);
         assert_eq!(l.heart.width, 3);
         assert_eq!(l.heart.x, l.meta.x + l.meta.width - 3);
+    }
+
+    #[test]
+    fn test_info_panel_cover_aspect_ratio() {
+        for (w, h) in [(50, 30), (40, 20), (30, 15), (60, 40), (25, 12)] {
+            let area = Rect { x: 0, y: 0, width: w, height: h };
+
+            // With album_border = true: inner area must be strictly 2:1
+            let l_bordered = layout(area, true);
+            if l_bordered.cover.width > 0 && l_bordered.cover.height > 0 {
+                let inner = l_bordered.cover.inner(ratatui::layout::Margin {
+                    horizontal: 1,
+                    vertical: 1,
+                });
+                assert_eq!(
+                    inner.width,
+                    inner.height * 2,
+                    "Bordered inner cover must be 2:1 character cell ratio for area {}x{}",
+                    w, h
+                );
+            }
+
+            // With album_border = false: outer cover area must be strictly 2:1
+            let l_borderless = layout(area, false);
+            if l_borderless.cover.width > 0 && l_borderless.cover.height > 0 {
+                assert_eq!(
+                    l_borderless.cover.width,
+                    l_borderless.cover.height * 2,
+                    "Borderless cover must be 2:1 character cell ratio for area {}x{}",
+                    w, h
+                );
+            }
+        }
     }
 
     #[test]

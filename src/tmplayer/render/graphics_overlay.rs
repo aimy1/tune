@@ -3,7 +3,7 @@ use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui_image::{
     Resize, StatefulImage,
-    picker::{Picker, ProtocolType},
+    picker::Picker,
     protocol::StatefulProtocol,
 };
 use std::collections::hash_map::DefaultHasher;
@@ -11,7 +11,7 @@ use std::hash::{Hash, Hasher};
 use std::{cell::LazyCell, collections::HashMap};
 
 use crate::{
-    data::config::GraphicsProtocol, render::graphics_overlay::map_segment_to_cover_crop,
+    data::config::GraphicsProtocol,
     tmplayer::app::state::AppState,
 };
 
@@ -91,7 +91,6 @@ impl GraphicsOverlay {
         let info_image_fn = || info_cover.and_then(|x| image::load_from_memory(x).ok());
         let playlist_image_fn = || playlist_cover.and_then(|x| image::load_from_memory(x).ok());
 
-        let halfblocks_mode = self.picker.protocol_type() == ProtocolType::Halfblocks;
         let (font_w, font_h) = self.picker.font_size();
         let cell_w_px = if font_w == 0 {
             FALLBACK_CELL_W_PX
@@ -120,38 +119,28 @@ impl GraphicsOverlay {
                 let need_init = !self.segment_protocols.contains_key(&segment_key);
                 if need_init && let Some(img) = &*img {
                     let (img_w, img_h) = img.dimensions();
-                    let crop = if halfblocks_mode {
-                        map_segment_to_cover_crop_fill(
-                            rect, segment, img_w, img_h, cell_w_px, cell_h_px,
-                        )
-                    } else {
-                        map_segment_to_cover_crop(rect, segment, img_w, img_h)
-                    };
+                    let crop = map_segment_to_cover_crop_fill(
+                        rect, segment, img_w, img_h, cell_w_px, cell_h_px,
+                    );
                     let Some((crop_x, crop_y, crop_w, crop_h)) = crop else {
                         continue;
                     };
                     let mut cropped = img.crop_imm(crop_x, crop_y, crop_w, crop_h);
-                    if halfblocks_mode {
-                        let target_px_w = u32::from(segment.width).saturating_mul(cell_w_px);
-                        let target_px_h = u32::from(segment.height).saturating_mul(cell_h_px);
-                        if target_px_w > 0 && target_px_h > 0 {
-                            cropped = cropped.resize_exact(
-                                target_px_w,
-                                target_px_h,
-                                FilterType::Triangle,
-                            );
-                        }
+                    let target_px_w = u32::from(segment.width).saturating_mul(cell_w_px);
+                    let target_px_h = u32::from(segment.height).saturating_mul(cell_h_px);
+                    if target_px_w > 0 && target_px_h > 0 {
+                        cropped = cropped.resize_exact(
+                            target_px_w,
+                            target_px_h,
+                            FilterType::Triangle,
+                        );
                     }
                     let proto = self.picker.new_resize_protocol(cropped);
                     self.segment_protocols.insert(segment_key.clone(), proto);
                 }
 
                 if let Some(proto) = self.segment_protocols.get_mut(&segment_key) {
-                    let widget = if halfblocks_mode {
-                        StatefulImage::default().resize(Resize::Crop(None))
-                    } else {
-                        StatefulImage::default()
-                    };
+                    let widget = StatefulImage::default().resize(Resize::Crop(None));
                     frame.render_stateful_widget(widget, segment, proto);
                 }
             }
@@ -287,5 +276,37 @@ fn cover_viewport_fill(
             .clamp(1.0, image_h as f64) as u32;
         let crop_y = (image_h.saturating_sub(crop_h)) / 2;
         (0, crop_y, image_w, crop_h)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cover_viewport_fill_square_cover_in_square_cells() {
+        // Square image (600x600) into 28x14 terminal cells with 8x16 font.
+        // Physical aspect ratio = (28 * 8) / (14 * 16) = 224 / 224 = 1.0.
+        // Image aspect ratio = 600 / 600 = 1.0.
+        // Result must be exact with zero crop.
+        let (x, y, w, h) = cover_viewport_fill(600, 600, 28, 14, 8, 16);
+        assert_eq!((x, y, w, h), (0, 0, 600, 600));
+
+        let segment = Rect::new(5, 5, 28, 14);
+        let crop = map_segment_to_cover_crop_fill(segment, segment, 600, 600, 8, 16);
+        assert_eq!(crop, Some((0, 0, 600, 600)));
+    }
+
+    #[test]
+    fn test_cover_viewport_fill_non_standard_font_metrics() {
+        // Square image (600x600) into 28x14 terminal cells with 10x24 font.
+        // target_ratio = (28 * 10) / (14 * 24) = 280 / 336 = 0.8333...
+        // Image ratio = 1.0 > target_ratio.
+        // Should crop width horizontally and keep height full (fill height, crop width).
+        let (x, y, w, h) = cover_viewport_fill(600, 600, 28, 14, 10, 24);
+        assert_eq!(h, 600);
+        assert_eq!(y, 0);
+        assert_eq!(w, 500); // 600 * 280/336 = 500
+        assert_eq!(x, 50); // (600 - 500) / 2 = 50
     }
 }

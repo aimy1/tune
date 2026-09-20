@@ -3,6 +3,7 @@ use ratatui::layout::Rect;
 const CELL_W_PX: u32 = 8;
 const CELL_H_PX: u32 = 16;
 
+#[allow(dead_code)]
 pub fn map_segment_to_cover_crop(
     base: Rect,
     segment: Rect,

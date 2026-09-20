@@ -160,17 +160,23 @@ impl Tui {
                 height: inner.height.saturating_sub(lyric_h_inner),
             };
 
-            let info_l = info_panel::layout(cols[0]);
+            let info_l = info_panel::layout(cols[0], app.config.album_border);
             layout_out.info_progress = info_l.progress;
             layout_out.info_controls = info_l.controls;
             layout_out.info_volume = control_buttons::volume_button_rect(info_l.controls, app);
             layout_out.info_heart = info_l.heart;
 
-            // For kitty graphics, we draw into the inner area (optional border).
-            layout_out.info_cover_image = info_l.cover.inner(ratatui::layout::Margin {
-                horizontal: 1,
-                vertical: 1,
-            });
+            // For graphics overlay, draw into the inner area if bordered, else full cover rect.
+            let show_border =
+                app.config.album_border && info_l.cover.width >= 4 && info_l.cover.height >= 3;
+            layout_out.info_cover_image = if show_border {
+                info_l.cover.inner(ratatui::layout::Margin {
+                    horizontal: 1,
+                    vertical: 1,
+                })
+            } else {
+                info_l.cover
+            };
 
             // base styling
             f.render_widget(ratatui::widgets::Clear, size);
@@ -1879,7 +1885,7 @@ fn render_volume_modal(f: &mut ratatui::Frame, size: Rect, app: &mut AppState) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(33), Constraint::Percentage(67)])
         .split(size);
-    let info_l = info_panel::layout(cols[0]);
+    let info_l = info_panel::layout(cols[0], app.config.album_border);
     let btn_rect = control_buttons::volume_button_rect(info_l.controls, app);
     let (area, _) = get_volume_popover_rect(size, cols[0], btn_rect);
 
