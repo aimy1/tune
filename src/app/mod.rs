@@ -450,6 +450,17 @@ impl HomeState {
         self.ensure_focus_visible();
     }
 
+    pub fn set_focus(&mut self, index: usize) {
+        if self.tiles.is_empty() {
+            self.focused_idx = 0;
+            self.scroll_row_offset = 0;
+            return;
+        }
+
+        self.focused_idx = index.min(self.tiles.len() - 1);
+        self.ensure_focus_visible();
+    }
+
     pub fn focus_next(&mut self) {
         if self.tiles.is_empty() {
             return;
@@ -2229,6 +2240,24 @@ impl App {
                         self.seek_to_ratio(ratio);
                     }
                 }
+            }
+            MouseEventKind::Moved => {
+                self.handle_mouse_hover(col, row);
+            }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if let Some(rect) = self.player_bar_hits.progress {
+                    if rect.contains(col, row) {
+                        let relative_x = col.saturating_sub(rect.x) as f32;
+                        let ratio = if rect.width <= 1 {
+                            0.0
+                        } else {
+                            (relative_x / (rect.width - 1) as f32).clamp(0.0, 1.0)
+                        };
+                        self.seek_to_ratio(ratio);
+                        return;
+                    }
+                }
+                self.handle_mouse_hover(col, row);
             }
             _ => {}
         }
@@ -5458,7 +5487,7 @@ impl App {
                     .map(|(_, idx)| *idx);
                 if let Some(idx) = hit {
                     if idx < self.home.tiles.len() {
-                        self.home.focused_idx = idx;
+                        self.home.set_focus(idx);
                         if self.is_double_content_click(Page::Home, idx) {
                             self.enter_home_tile().await;
                         }
@@ -5517,6 +5546,133 @@ impl App {
             _ => {}
         }
         false
+    }
+
+    pub fn handle_mouse_hover(&mut self, col: u16, row: u16) {
+        if matches!(
+            self.overlay,
+            Some(Overlay::Settings)
+                | Some(Overlay::SettingsTransparency)
+                | Some(Overlay::SettingsPlayback)
+                | Some(Overlay::SettingsDesktopLyrics)
+                | Some(Overlay::SettingsKeybinds)
+        ) {
+            let hits = self.get_settings_modal_hits();
+            let Some(list) = hits.list_area else {
+                return;
+            };
+            if !list.contains(col, row) {
+                return;
+            }
+
+            let hovered_row = (row - list.y) as usize;
+            let item_idx = hovered_row + hits.list_scroll;
+            if item_idx >= hits.list_count {
+                return;
+            }
+
+            match self.overlay {
+                Some(Overlay::Settings) => {
+                    if item_idx < SETTINGS_ROOT_ITEMS {
+                        self.settings_selected = item_idx;
+                    }
+                }
+                Some(Overlay::SettingsTransparency) => {
+                    if item_idx < SETTINGS_TRANSPARENCY_ITEMS {
+                        self.settings_transparency_selected = item_idx;
+                    }
+                }
+                Some(Overlay::SettingsPlayback) => {
+                    if item_idx < SETTINGS_PLAYBACK_ITEMS {
+                        self.settings_playback_selected = item_idx;
+                    }
+                }
+                Some(Overlay::SettingsDesktopLyrics) => {
+                    if item_idx < SETTINGS_DESKTOP_LYRICS_ITEMS {
+                        self.settings_desktop_lyrics_selected = item_idx;
+                    }
+                }
+                Some(Overlay::SettingsKeybinds) => {
+                    if self.settings_keybind_rebinding.is_none() && item_idx < SETTINGS_KEYBIND_ITEMS {
+                        self.settings_keybind_selected = item_idx;
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
+
+        if self.overlay.is_some() {
+            return;
+        }
+
+        match self.page {
+            Page::Home => {
+                if self.home_sidebar.is_visible() && self.home_sidebar.expanded {
+                    if let Some(panel) = self.home_sidebar_panel_hit {
+                        if panel.contains(col, row) {
+                            let sidebar_hit = self
+                                .home_sidebar_playlist_hits
+                                .iter()
+                                .find(|(rect, _)| rect.contains(col, row))
+                                .map(|(_, hit)| *hit);
+                            if let Some(hit) = sidebar_hit {
+                                self.home_sidebar.set_focus(hit.section, hit.index);
+                            }
+                        }
+                    }
+                    return;
+                }
+
+                let hit = self
+                    .home_tile_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(col, row))
+                    .map(|(_, idx)| *idx);
+                if let Some(idx) = hit {
+                    if idx < self.home.tiles.len() {
+                        self.home.set_focus(idx);
+                    }
+                }
+            }
+            Page::Playlist => {
+                let hit = self
+                    .playlist_track_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(col, row))
+                    .map(|(_, idx)| *idx);
+                if let Some(idx) = hit {
+                    if idx < self.playlist.tracks.len() {
+                        self.playlist.set_focus(idx);
+                    }
+                }
+            }
+            Page::Author => {
+                let hit = self
+                    .author_tile_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(col, row))
+                    .map(|(_, idx)| *idx);
+                if let Some(idx) = hit {
+                    if idx < self.author.tiles.len() {
+                        self.author.set_focus(idx);
+                    }
+                }
+            }
+            Page::Search => {
+                let hit = self
+                    .search_item_hits
+                    .iter()
+                    .find(|(rect, _)| rect.contains(col, row))
+                    .map(|(_, idx)| *idx);
+                if let Some(idx) = hit {
+                    if idx < self.search.results.len() {
+                        self.search.set_focus(idx);
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     pub fn open_search_box(&mut self) {
@@ -8236,5 +8392,154 @@ mod tests {
         assert_eq!(app.config.keybind_desktop_lyrics_lock, "Alt+S");
         assert_eq!(app.config.keybind_fullscreen_prev, "[");
         assert_eq!(app.config.keybind_fullscreen_next, "]");
+    }
+
+    #[tokio::test]
+    async fn test_mouse_hover_playlist_track() {
+        let mut app = create_test_app().await;
+        app.page = Page::Playlist;
+        let make_track = |id: &str, title: &str| PlaylistTrack {
+            kind: PlaylistTrackKind::Song,
+            id: Some(id.to_string()),
+            title: title.to_string(),
+            artist: "Artist".to_string(),
+            album: "Album".to_string(),
+            cover_url: None,
+            duration_ms: 180000,
+            duration: "03:00".to_string(),
+        };
+        app.playlist.set_tracks(vec![
+            make_track("1", "Song 1"),
+            make_track("2", "Song 2"),
+            make_track("3", "Song 3"),
+            make_track("4", "Song 4"),
+        ]);
+        assert_eq!(app.playlist.focused_idx, 0);
+
+        app.clear_content_hits();
+        app.push_playlist_track_hit(
+            HitRect {
+                x: 0,
+                y: 10,
+                width: 50,
+                height: 1,
+            },
+            2,
+        );
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 15,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+
+        assert_eq!(app.playlist.focused_idx, 2);
+    }
+
+    #[tokio::test]
+    async fn test_mouse_hover_home_tile() {
+        let mut app = create_test_app().await;
+        app.page = Page::Home;
+        app.home.set_tiles(vec![
+            HomeTile::placeholder_daily(),
+            HomeTile::placeholder_daily(),
+            HomeTile::placeholder_daily(),
+        ]);
+        assert_eq!(app.home.focused_idx, 0);
+
+        app.clear_content_hits();
+        app.push_home_tile_hit(
+            HitRect {
+                x: 20,
+                y: 5,
+                width: 10,
+                height: 5,
+            },
+            1,
+        );
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 25,
+            row: 7,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+
+        assert_eq!(app.home.focused_idx, 1);
+    }
+
+    #[tokio::test]
+    async fn test_mouse_hover_settings_menu() {
+        let mut app = create_test_app().await;
+        app.overlay = Some(Overlay::Settings);
+        app.settings_selected = 0;
+
+        // List starts at row 7, so row 10 corresponds to index 3
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 20,
+            row: 10,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+
+        assert_eq!(app.settings_selected, 3);
+    }
+
+    #[tokio::test]
+    async fn test_mouse_hover_sidebar_playlist() {
+        let mut app = create_test_app().await;
+        app.page = Page::Home;
+        app.home_sidebar.expanded = true;
+        app.home_sidebar.created_playlists = vec![
+            HomeSidebarPlaylist {
+                id: Some("1".to_string()),
+                title: "Playlist 1".to_string(),
+                creator: "User".to_string(),
+                track_count: 5,
+                cover_url: None,
+            },
+            HomeSidebarPlaylist {
+                id: Some("2".to_string()),
+                title: "Playlist 2".to_string(),
+                creator: "User".to_string(),
+                track_count: 10,
+                cover_url: None,
+            },
+        ];
+
+        app.clear_content_hits();
+        app.set_home_sidebar_panel_hit(Some(HitRect {
+            x: 0,
+            y: 0,
+            width: 30,
+            height: 25,
+        }));
+        app.push_home_sidebar_playlist_hit(
+            HitRect {
+                x: 2,
+                y: 6,
+                width: 20,
+                height: 1,
+            },
+            HomeSidebarHit {
+                section: HomeSidebarSection::Created,
+                index: 1,
+            },
+        );
+
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 10,
+            row: 6,
+            modifiers: crossterm::event::KeyModifiers::empty(),
+        })
+        .await;
+
+        assert_eq!(app.home_sidebar.focused_section, HomeSidebarSection::Created);
+        assert_eq!(app.home_sidebar.focused_index, 1);
     }
 }

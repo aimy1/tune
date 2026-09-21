@@ -2246,11 +2246,181 @@ pub fn hit_test(layout: &UiLayout, app: &AppState, col: u16, row: u16) -> Option
     }
 
     if contains(layout.playlist_list_inner, col, row) {
-        let idx = row.saturating_sub(layout.playlist_list_inner.y) as usize;
-        return Some(Action::PlaylistSelect(idx));
+        let total = app.playlist_view.items.len();
+        if total > 0 {
+            let footer_rows: u16 = 2;
+            let visible = layout.playlist_list_inner.height.saturating_sub(footer_rows) as usize;
+            let selected = app.playlist_view.selected.min(total.saturating_sub(1));
+            let mut start = 0usize;
+            if visible > 0 && total > visible {
+                if selected >= visible {
+                    start = selected + 1 - visible;
+                }
+                start = start.min(total - visible);
+            }
+            let rel_row = row.saturating_sub(layout.playlist_list_inner.y) as usize;
+            if rel_row < visible {
+                let idx = start + rel_row;
+                if idx < total {
+                    return Some(Action::PlaylistSelect(idx));
+                }
+            }
+        }
+        return None;
     }
 
     None
+}
+
+pub fn hit_test_hover(layout: &UiLayout, app: &mut AppState, col: u16, row: u16) {
+    if app.overlay == Overlay::SettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if contains(area, col, row) && row != area.y {
+            let inner = area.inner(ratatui::layout::Margin {
+                horizontal: 2,
+                vertical: 1,
+            });
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+            if contains(rows[1], col, row) {
+                let idx = (row.saturating_sub(rows[1].y)) as usize;
+                if idx < 12 {
+                    app.settings_selected = idx;
+                }
+            }
+        }
+        return;
+    }
+
+    if app.overlay == Overlay::TransparencySettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if contains(area, col, row) && row != area.y {
+            let inner = area.inner(ratatui::layout::Margin {
+                horizontal: 2,
+                vertical: 1,
+            });
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+            if contains(rows[1], col, row) {
+                let idx = (row.saturating_sub(rows[1].y)) as usize;
+                if idx < 4 {
+                    app.transparency_settings_selected = idx;
+                }
+            }
+        }
+        return;
+    }
+
+    if app.overlay == Overlay::BarSettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if contains(area, col, row) && row != area.y {
+            let inner = area.inner(ratatui::layout::Margin {
+                horizontal: 2,
+                vertical: 1,
+            });
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+            if contains(rows[1], col, row) {
+                let idx = (row.saturating_sub(rows[1].y)) as usize;
+                if idx < 9 {
+                    app.bar_settings_selected = idx;
+                }
+            }
+        }
+        return;
+    }
+
+    if app.overlay == Overlay::DesktopLyricsSettingsModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if contains(area, col, row) && row != area.y {
+            let inner = area.inner(ratatui::layout::Margin {
+                horizontal: 2,
+                vertical: 1,
+            });
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+            if contains(rows[1], col, row) {
+                let idx = (row.saturating_sub(rows[1].y)) as usize;
+                if idx < 9 {
+                    app.desktop_lyrics_settings_selected = idx;
+                }
+            }
+        }
+        return;
+    }
+
+    if app.overlay == Overlay::HelpModal {
+        let area = centered_rect(layout.full, 70, 20);
+        if contains(area, col, row) && row != area.y {
+            let inner = area.inner(ratatui::layout::Margin {
+                horizontal: 2,
+                vertical: 1,
+            });
+            let rows = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(1),
+                    Constraint::Min(1),
+                    Constraint::Length(1),
+                ])
+                .split(inner);
+            if contains(rows[1], col, row) {
+                let idx = (row.saturating_sub(rows[1].y)) as usize;
+                if idx < 17 {
+                    app.help_keybind_selected = idx;
+                }
+            }
+        }
+        return;
+    }
+
+    if contains(layout.playlist_list_inner, col, row) {
+        let total = app.playlist_view.items.len();
+        if total > 0 {
+            let footer_rows: u16 = 2;
+            let visible = layout.playlist_list_inner.height.saturating_sub(footer_rows) as usize;
+            let selected = app.playlist_view.selected.min(total.saturating_sub(1));
+            let mut start = 0usize;
+            if visible > 0 && total > visible {
+                if selected >= visible {
+                    start = selected + 1 - visible;
+                }
+                start = start.min(total - visible);
+            }
+            let rel_row = row.saturating_sub(layout.playlist_list_inner.y) as usize;
+            if rel_row < visible {
+                let idx = start + rel_row;
+                if idx < total {
+                    app.playlist_view.selected = idx;
+                    app.playlist_view.clamp_selected();
+                }
+            }
+        }
+    }
 }
 
 fn contains(r: Rect, col: u16, row: u16) -> bool {
@@ -2413,6 +2583,44 @@ mod tests {
         let small_area = about_modal_area(small_terminal);
         assert!(small_area.width <= small_terminal.width);
         assert!(small_area.height <= small_terminal.height);
+    }
+
+    #[test]
+    fn test_hit_test_hover_playlist_and_settings() {
+        let mut app = AppState::new(
+            crate::tmplayer::data::config::Config::default(),
+            crate::tmplayer::ui::theme::Theme::default(),
+            crate::data::config::Language::Zh,
+        );
+        app.playlist_view.items = vec![
+            crate::tmplayer::data::playlist::PlaylistItem {
+                title: "Track 1".to_string(),
+                path: std::path::PathBuf::from("/music/1.mp3"),
+            },
+            crate::tmplayer::data::playlist::PlaylistItem {
+                title: "Track 2".to_string(),
+                path: std::path::PathBuf::from("/music/2.mp3"),
+            },
+            crate::tmplayer::data::playlist::PlaylistItem {
+                title: "Track 3".to_string(),
+                path: std::path::PathBuf::from("/music/3.mp3"),
+            },
+        ];
+        app.playlist_view.selected = 0;
+
+        let mut layout = UiLayout::default();
+        layout.full = Rect { x: 0, y: 0, width: 100, height: 30 };
+        layout.playlist_list_inner = Rect { x: 70, y: 5, width: 30, height: 10 };
+
+        // Hover over row 2 in playlist list (y = 5 + 2 = 7)
+        hit_test_hover(&layout, &mut app, 75, 7);
+        assert_eq!(app.playlist_view.selected, 2);
+
+        // Test SettingsModal hover
+        app.overlay = Overlay::SettingsModal;
+        app.settings_selected = 0;
+        hit_test_hover(&layout, &mut app, 30, 11);
+        assert_eq!(app.settings_selected, 4);
     }
 }
 

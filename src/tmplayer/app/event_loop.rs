@@ -2203,6 +2203,9 @@ async fn handle_action(
                 .await?;
             }
         }
+        Action::MouseMove { col, row } => {
+            crate::tmplayer::ui::tui::hit_test_hover(layout, app, col, row);
+        }
         Action::None => {}
     }
 

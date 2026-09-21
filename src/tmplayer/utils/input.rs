@@ -65,6 +65,7 @@ pub enum Action {
     FolderBackspace,
 
     MouseClick { col: u16, row: u16 },
+    MouseMove { col: u16, row: u16 },
 
     None,
 }
@@ -364,6 +365,10 @@ pub fn map_mouse(ev: MouseEvent) -> Action {
             col: ev.column,
             row: ev.row,
         },
+        MouseEventKind::Moved | MouseEventKind::Drag(MouseButton::Left) => Action::MouseMove {
+            col: ev.column,
+            row: ev.row,
+        },
         MouseEventKind::ScrollUp => Action::VolumeUp,
         MouseEventKind::ScrollDown => Action::VolumeDown,
         _ => Action::None,
@@ -649,5 +654,24 @@ mod tests {
 
         assert_eq!(map_key(make_ev(KeyCode::Char('v')), Overlay::VolumeModal, &config), Action::CloseOverlay);
         assert_eq!(map_key(make_ev(KeyCode::Char('V')), Overlay::VolumeModal, &config), Action::CloseOverlay);
+    }
+
+    #[test]
+    fn test_map_mouse_moved_and_drag() {
+        let ev_move = MouseEvent {
+            kind: MouseEventKind::Moved,
+            column: 12,
+            row: 34,
+            modifiers: KeyModifiers::empty(),
+        };
+        assert_eq!(map_mouse(ev_move), Action::MouseMove { col: 12, row: 34 });
+
+        let ev_drag = MouseEvent {
+            kind: MouseEventKind::Drag(MouseButton::Left),
+            column: 56,
+            row: 78,
+            modifiers: KeyModifiers::empty(),
+        };
+        assert_eq!(map_mouse(ev_drag), Action::MouseMove { col: 56, row: 78 });
     }
 }
