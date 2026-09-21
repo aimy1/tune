@@ -2,24 +2,24 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 pub(crate) const RESERVED_RESET_KEYBIND: &str = "Ctrl+Alt+R";
 
-pub(crate) const DEFAULT_KEYBIND_SEARCH_BOX: &str = "Ctrl+S";
-pub(crate) const DEFAULT_KEYBIND_FULLSCREEN: &str = "Ctrl+F";
-pub(crate) const DEFAULT_KEYBIND_SETTINGS: &str = "T";
-pub(crate) const DEFAULT_KEYBIND_SIDEBAR: &str = "P";
+pub(crate) const DEFAULT_KEYBIND_SEARCH_BOX: &str = "S";
+pub(crate) const DEFAULT_KEYBIND_FULLSCREEN: &str = "F";
+pub(crate) const DEFAULT_KEYBIND_SETTINGS: &str = ",";
+pub(crate) const DEFAULT_KEYBIND_SIDEBAR: &str = "B";
 pub(crate) const DEFAULT_KEYBIND_QUIT: &str = "Q";
-pub(crate) const DEFAULT_KEYBIND_PREV: &str = "Alt+Left";
-pub(crate) const DEFAULT_KEYBIND_NEXT: &str = "Alt+Right";
-pub(crate) const DEFAULT_KEYBIND_TOGGLE_PLAY_PAUSE: &str = "Alt+Space";
-pub(crate) const DEFAULT_KEYBIND_TOGGLE_MODE: &str = "Alt+M";
-pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_PREV: &str = "Left";
-pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_NEXT: &str = "Right";
+pub(crate) const DEFAULT_KEYBIND_PREV: &str = "[";
+pub(crate) const DEFAULT_KEYBIND_NEXT: &str = "]";
+pub(crate) const DEFAULT_KEYBIND_TOGGLE_PLAY_PAUSE: &str = "Space";
+pub(crate) const DEFAULT_KEYBIND_TOGGLE_MODE: &str = "M";
+pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_PREV: &str = "[";
+pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_NEXT: &str = "]";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_TOGGLE_PLAY_PAUSE: &str = "Space";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_TOGGLE_MODE: &str = "M";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ: &str = "E";
 pub(crate) const DEFAULT_KEYBIND_FULLSCREEN_EQ_RESET: &str = "Alt+R";
 pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN: &str = "L";
-pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED: &str = "Alt+L";
-pub(crate) const DEFAULT_KEYBIND_DESKTOP_LYRICS: &str = "Alt+D";
+pub(crate) const DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED: &str = "L";
+pub(crate) const DEFAULT_KEYBIND_DESKTOP_LYRICS: &str = "D";
 pub(crate) const DEFAULT_KEYBIND_DESKTOP_LYRICS_LOCK: &str = "Alt+S";
 #[allow(dead_code)]
 pub(crate) const DEFAULT_KEYBIND_PERSONAL_CENTER: &str = "Z";
@@ -274,7 +274,7 @@ mod tests {
     fn test_desktop_lyrics_keybind_matches() {
         let ev = KeyEvent {
             code: KeyCode::Char('d'),
-            modifiers: KeyModifiers::ALT,
+            modifiers: KeyModifiers::empty(),
             kind: KeyEventKind::Press,
             state: crossterm::event::KeyEventState::empty(),
         };
@@ -282,7 +282,7 @@ mod tests {
 
         let ev_upper = KeyEvent {
             code: KeyCode::Char('D'),
-            modifiers: KeyModifiers::ALT,
+            modifiers: KeyModifiers::empty(),
             kind: KeyEventKind::Press,
             state: crossterm::event::KeyEventState::empty(),
         };

@@ -345,19 +345,19 @@ fn default_show_hints() -> bool {
 }
 
 fn default_keybind_search_box() -> String {
-    "S".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_SEARCH_BOX.to_string()
 }
 
 fn default_keybind_fullscreen() -> String {
-    "F".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN.to_string()
 }
 
 fn default_keybind_settings() -> String {
-    ",".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_SETTINGS.to_string()
 }
 
 fn default_keybind_sidebar() -> String {
-    "B".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_SIDEBAR.to_string()
 }
 
 #[allow(dead_code)]
@@ -366,72 +366,79 @@ fn is_legacy_sidebar_default(value: &str) -> bool {
     normalized == "alt+b"
 }
 
+#[allow(dead_code)]
+fn is_legacy_fullscreen_nav_default(prev: &str, next: &str) -> bool {
+    let p = prev.trim().to_ascii_lowercase().replace(' ', "");
+    let n = next.trim().to_ascii_lowercase().replace(' ', "");
+    p == "left" && n == "right"
+}
+
 fn default_keybind_quit() -> String {
-    "Q".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_QUIT.to_string()
 }
 
 fn default_keybind_prev() -> String {
-    "[".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_PREV.to_string()
 }
 
 fn default_keybind_next() -> String {
-    "]".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_NEXT.to_string()
 }
 
 fn default_keybind_toggle_play_pause() -> String {
-    "Space".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_TOGGLE_PLAY_PAUSE.to_string()
 }
 
 fn default_keybind_toggle_mode() -> String {
-    "M".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_TOGGLE_MODE.to_string()
 }
 
 fn default_keybind_fullscreen_prev() -> String {
-    "Left".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_PREV.to_string()
 }
 
 fn default_keybind_fullscreen_next() -> String {
-    "Right".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_NEXT.to_string()
 }
 
 fn default_keybind_fullscreen_toggle_play_pause() -> String {
-    "Space".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_TOGGLE_PLAY_PAUSE.to_string()
 }
 
 fn default_keybind_fullscreen_toggle_mode() -> String {
-    "M".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_TOGGLE_MODE.to_string()
 }
 
 fn default_keybind_fullscreen_eq() -> String {
-    "E".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_EQ.to_string()
 }
 
 fn default_keybind_fullscreen_eq_reset() -> String {
-    "Alt+R".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_FULLSCREEN_EQ_RESET.to_string()
 }
 
 fn default_keybind_toggle_like_fullscreen() -> String {
-    "L".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_TOGGLE_LIKE_FULLSCREEN.to_string()
 }
 
 fn default_keybind_toggle_like_collapsed() -> String {
-    "Alt+L".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_TOGGLE_LIKE_COLLAPSED.to_string()
 }
 
 fn default_keybind_personal_center() -> String {
-    "Z".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_PERSONAL_CENTER.to_string()
 }
 
 fn default_keybind_home() -> String {
-    "X".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_HOME.to_string()
 }
 
 fn default_keybind_desktop_lyrics() -> String {
-    "Alt+D".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS.to_string()
 }
 
 fn default_keybind_desktop_lyrics_lock() -> String {
-    "Alt+S".to_string()
+    crate::app::keybinds::DEFAULT_KEYBIND_DESKTOP_LYRICS_LOCK.to_string()
 }
 
 fn default_desktop_lyrics_locked() -> bool {
@@ -559,6 +566,11 @@ impl Config {
         if is_legacy_sidebar_default(&cfg.keybind_sidebar) {
             cfg.keybind_sidebar = default_keybind_sidebar();
             migrated_legacy_sidebar = true;
+        }
+
+        if is_legacy_fullscreen_nav_default(&cfg.keybind_fullscreen_prev, &cfg.keybind_fullscreen_next) {
+            cfg.keybind_fullscreen_prev = default_keybind_fullscreen_prev();
+            cfg.keybind_fullscreen_next = default_keybind_fullscreen_next();
         }
 
         // Auto-migrate missing fields into the config file.

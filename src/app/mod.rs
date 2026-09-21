@@ -2004,11 +2004,20 @@ impl App {
         }
 
         if self.page != Page::Login
-            && (key.modifiers.is_empty() || key.modifiers == KeyModifiers::SHIFT)
-            && matches!(key.code, KeyCode::Char('x') | KeyCode::Char('X'))
+            && (key.modifiers.contains(KeyModifiers::SHIFT)
+                || key.modifiers.contains(KeyModifiers::CONTROL))
         {
-            self.go_to_home_page();
-            return;
+            match key.code {
+                KeyCode::Left => {
+                    self.mpris_seek_relative(-5_000_000);
+                    return;
+                }
+                KeyCode::Right => {
+                    self.mpris_seek_relative(5_000_000);
+                    return;
+                }
+                _ => {}
+            }
         }
 
         match self.page {
@@ -2939,19 +2948,6 @@ impl App {
             return false;
         };
 
-        if matches!(
-            action,
-            KeybindAction::ToggleLikeFullscreen
-                | KeybindAction::FullscreenPrev
-                | KeybindAction::FullscreenNext
-                | KeybindAction::FullscreenTogglePlayPause
-                | KeybindAction::FullscreenToggleMode
-                | KeybindAction::FullscreenEq
-                | KeybindAction::FullscreenEqReset
-        ) {
-            return false;
-        }
-
         if !self.can_execute_global_hotkey() {
             return true;
         }
@@ -3107,13 +3103,6 @@ impl App {
             KeybindAction::Next,
             KeybindAction::TogglePlayPause,
             KeybindAction::ToggleMode,
-            KeybindAction::FullscreenPrev,
-            KeybindAction::FullscreenNext,
-            KeybindAction::FullscreenTogglePlayPause,
-            KeybindAction::FullscreenToggleMode,
-            KeybindAction::FullscreenEq,
-            KeybindAction::FullscreenEqReset,
-            KeybindAction::ToggleLikeFullscreen,
             KeybindAction::ToggleLikeCollapsed,
             KeybindAction::PersonalCenter,
             KeybindAction::Home,
@@ -3210,8 +3199,13 @@ impl App {
 
     fn find_keybind_conflict(&self, current_index: usize, binding: &str) -> Option<usize> {
         let normalized = normalize_keybind_text(binding)?;
+        let current_scope = keybind_scope_for_index(current_index);
         for other_index in 0..SETTINGS_KEYBIND_ITEMS {
             if other_index == current_index {
+                continue;
+            }
+            let other_scope = keybind_scope_for_index(other_index);
+            if !keybind_scopes_conflict(current_scope, other_scope) {
                 continue;
             }
             let Some(other_binding) = self.keybind_value_for_index(other_index) else {
@@ -3226,6 +3220,41 @@ impl App {
         }
         None
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum KeybindScope {
+    Global,
+    Standard,
+    Fullscreen,
+}
+
+fn keybind_scope_for_index(index: usize) -> KeybindScope {
+    match index {
+        1 /* Fullscreen */ | 4 /* Quit */ | 19 /* DesktopLyrics */ | 20 /* DesktopLyricsLock */ => {
+            KeybindScope::Global
+        }
+        8 /* FullscreenPrev */
+        | 9 /* FullscreenNext */
+        | 10 /* FullscreenTogglePlayPause */
+        | 11 /* FullscreenToggleMode */
+        | 12 /* FullscreenEq */
+        | 13 /* FullscreenEqReset */
+        | 14 /* ToggleLikeFullscreen */ => KeybindScope::Fullscreen,
+        _ => KeybindScope::Standard,
+    }
+}
+
+fn keybind_scopes_conflict(a: KeybindScope, b: KeybindScope) -> bool {
+    match (a, b) {
+        (KeybindScope::Global, _) | (_, KeybindScope::Global) => true,
+        (KeybindScope::Standard, KeybindScope::Standard) => true,
+        (KeybindScope::Fullscreen, KeybindScope::Fullscreen) => true,
+        _ => false,
+    }
+}
+
+impl App {
 
     fn keybind_name_for_index(&self, index: usize) -> &'static str {
         match index {
@@ -8153,5 +8182,59 @@ mod tests {
         assert!(app.settings_modal_hits.modal_area.is_some());
         assert!(app.settings_modal_hits.list_area.is_some());
         assert_eq!(app.settings_modal_hits.list_count, SETTINGS_TRANSPARENCY_ITEMS);
+    }
+
+    #[tokio::test]
+    async fn test_keybind_scopes_allow_cross_mode_reuse() {
+        let app = create_test_app().await;
+
+        // Space can be used by both Standard play/pause and Fullscreen play/pause without conflict
+        assert_eq!(app.find_keybind_conflict(7, "Space"), None);
+        assert_eq!(app.find_keybind_conflict(10, "Space"), None);
+
+        // 'M' can be used by both Standard toggle mode and Fullscreen toggle mode without conflict
+        assert_eq!(app.find_keybind_conflict(15, "M"), None);
+        assert_eq!(app.find_keybind_conflict(11, "M"), None);
+
+        // 'L' can be used by both Standard collapsed like and Fullscreen like without conflict
+        assert_eq!(app.find_keybind_conflict(16, "L"), None);
+        assert_eq!(app.find_keybind_conflict(14, "L"), None);
+
+        // Intra-scope conflict: setting index 7 (Standard Play/Pause) to "S" (already SearchBox, Standard) conflicts
+        assert_eq!(app.find_keybind_conflict(7, "S"), Some(0));
+
+        // Global conflict: setting index 4 (Global Quit) to "Space" (Play/Pause) conflicts
+        assert_eq!(app.find_keybind_conflict(4, "Space"), Some(7));
+    }
+
+    #[tokio::test]
+    async fn test_keybind_action_from_event_matches_collapsed_like() {
+        let app = create_test_app().await;
+        let ev = crossterm::event::KeyEvent::new(
+            crossterm::event::KeyCode::Char('l'),
+            crossterm::event::KeyModifiers::empty(),
+        );
+        let action = app.keybind_action_from_event(ev);
+        assert!(matches!(action, Some(crate::app::keybinds::KeybindAction::ToggleLikeCollapsed)));
+    }
+
+    #[tokio::test]
+    async fn test_reset_keybinds_restores_standard_defaults() {
+        let mut app = create_test_app().await;
+        app.config.keybind_search_box = "Ctrl+Alt+S".to_string();
+        app.reset_keybinds_to_default();
+        assert_eq!(app.config.keybind_search_box, "S");
+        assert_eq!(app.config.keybind_fullscreen, "F");
+        assert_eq!(app.config.keybind_settings, ",");
+        assert_eq!(app.config.keybind_sidebar, "B");
+        assert_eq!(app.config.keybind_prev, "[");
+        assert_eq!(app.config.keybind_next, "]");
+        assert_eq!(app.config.keybind_toggle_play_pause, "Space");
+        assert_eq!(app.config.keybind_toggle_mode, "M");
+        assert_eq!(app.config.keybind_toggle_like_collapsed, "L");
+        assert_eq!(app.config.keybind_desktop_lyrics, "D");
+        assert_eq!(app.config.keybind_desktop_lyrics_lock, "Alt+S");
+        assert_eq!(app.config.keybind_fullscreen_prev, "[");
+        assert_eq!(app.config.keybind_fullscreen_next, "]");
     }
 }

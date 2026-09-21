@@ -55,12 +55,14 @@ keybind_prev = "["
 keybind_next = "]"
 keybind_toggle_play_pause = "Space"
 keybind_toggle_mode = "M"
-keybind_fullscreen_prev = "Left"
-keybind_fullscreen_next = "Right"
+keybind_fullscreen_prev = "["
+keybind_fullscreen_next = "]"
 keybind_fullscreen_toggle_play_pause = "Space"
 keybind_fullscreen_toggle_mode = "M"
 keybind_toggle_like_fullscreen = "L"
 keybind_toggle_like_collapsed = "L"
+keybind_desktop_lyrics = "D"
+keybind_desktop_lyrics_lock = "Alt+S"
 
 # ==============================================================================
 # UI 配色注入与覆盖 (可选)

@@ -213,7 +213,11 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
 
     if overlay == Overlay::VolumeModal {
         return match ev.code {
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => Action::CloseOverlay,
+            KeyCode::Esc
+            | KeyCode::Char('v')
+            | KeyCode::Char('V')
+            | KeyCode::Char('q')
+            | KeyCode::Char('Q') => Action::CloseOverlay,
             KeyCode::Enter => Action::CloseOverlay,
             KeyCode::Left | KeyCode::Down => Action::VolumeDown,
             KeyCode::Right | KeyCode::Up => Action::VolumeUp,
@@ -227,22 +231,23 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
             return Action::TogglePlaylist;
         }
         match ev.code {
+            KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => return Action::CloseOverlay,
             KeyCode::Enter => return Action::Confirm,
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('K') => {
                 if ev.modifiers.contains(KeyModifiers::CONTROL) {
                     return Action::PlaylistMoveItemUp;
                 } else {
                     return Action::PlaylistUp;
                 }
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('J') => {
                 if ev.modifiers.contains(KeyModifiers::CONTROL) {
                     return Action::PlaylistMoveItemDown;
                 } else {
                     return Action::PlaylistDown;
                 }
             }
-            _ => {}
+            _ => return Action::None,
         }
     }
 
@@ -344,8 +349,8 @@ pub fn map_key(ev: KeyEvent, overlay: Overlay, config: &Config) -> Action {
         KeyCode::Char(']') => Action::Next,
         KeyCode::Esc => Action::Quit,
         KeyCode::Enter => Action::Confirm,
-        KeyCode::Left => Action::Prev,
-        KeyCode::Right => Action::Next,
+        KeyCode::Left => Action::SeekDelta(-5.0),
+        KeyCode::Right => Action::SeekDelta(5.0),
         KeyCode::Up => Action::VolumeUp,
         KeyCode::Down => Action::VolumeDown,
         KeyCode::Char(' ') => Action::TogglePlayPause,
@@ -597,5 +602,52 @@ mod tests {
             state: crossterm::event::KeyEventState::empty(),
         };
         assert_eq!(map_key(ev, Overlay::None, &config), Action::ToggleDesktopLyricsLock);
+    }
+
+    #[test]
+    fn test_playlist_modal_esc_and_p_close() {
+        let config = Config::default();
+        let make_ev = |code: KeyCode| KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+
+        assert_eq!(map_key(make_ev(KeyCode::Esc), Overlay::Playlist, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Char('p')), Overlay::Playlist, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Char('P')), Overlay::Playlist, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Char('j')), Overlay::Playlist, &config), Action::PlaylistDown);
+        assert_eq!(map_key(make_ev(KeyCode::Char('k')), Overlay::Playlist, &config), Action::PlaylistUp);
+    }
+
+    #[test]
+    fn test_fullscreen_left_right_seek() {
+        let config = Config::default();
+        let make_ev = |code: KeyCode| KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+
+        assert_eq!(map_key(make_ev(KeyCode::Left), Overlay::None, &config), Action::SeekDelta(-5.0));
+        assert_eq!(map_key(make_ev(KeyCode::Right), Overlay::None, &config), Action::SeekDelta(5.0));
+        assert_eq!(map_key(make_ev(KeyCode::Char('[')), Overlay::None, &config), Action::Prev);
+        assert_eq!(map_key(make_ev(KeyCode::Char(']')), Overlay::None, &config), Action::Next);
+    }
+
+    #[test]
+    fn test_volume_modal_v_closes() {
+        let config = Config::default();
+        let make_ev = |code: KeyCode| KeyEvent {
+            code,
+            modifiers: KeyModifiers::empty(),
+            kind: KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::empty(),
+        };
+
+        assert_eq!(map_key(make_ev(KeyCode::Char('v')), Overlay::VolumeModal, &config), Action::CloseOverlay);
+        assert_eq!(map_key(make_ev(KeyCode::Char('V')), Overlay::VolumeModal, &config), Action::CloseOverlay);
     }
 }
